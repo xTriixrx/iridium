@@ -36,7 +36,7 @@ pub fn execute(args: &Vec<String>) -> i32 {
 }
 
 fn launch(args: &Vec<String>) -> i32 {
-    let mut res = Command::new(&args[0])
+    let res = Command::new(&args[0])
         .args(&args[1..])
         .spawn();
     
