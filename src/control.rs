@@ -3,6 +3,7 @@ use crate::process;
 use std::env;
 use std::error::Error;
 use std::io::{self, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     let mut status: i32 = 0;
@@ -10,7 +11,7 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     let mut stdout = io::stdout();
     let mut line = String::new();
     
-    //
+    // Main command control loop for processing commands
     loop {
         generate_prompt(&status);
         let _ = stdout.flush();
@@ -18,11 +19,16 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
         read_line(&mut line)?;
         
         let tokens = parse_tokens(&line);
+        let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        
         status = process::execute(&tokens);
 
         if status == process::exit::EXIT_CODE {
             return Ok(());
         }
+
+        // Append executed line to end of history
+        process::history::append_history(unix_timestamp, status, &line);
 
         line.clear();
     }
