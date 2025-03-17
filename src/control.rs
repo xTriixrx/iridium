@@ -3,38 +3,53 @@ use crate::process;
 use std::env;
 use std::error::Error;
 use std::io::{self, Write};
+use rustyline::{self, DefaultEditor};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     let mut status: i32 = 0;
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut line = String::new();
+    let mut rustyline = DefaultEditor::new().unwrap();
     
     // Main command control loop for processing commands
     loop {
-        generate_prompt(&status);
+        let prompt = generate_prompt(&status);
         let _ = stdout.flush();
         
-        read_line(&mut line)?;
-        
-        let tokens = parse_tokens(&line);
-        let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        
-        status = process::execute(&tokens);
+        let readline = rustyline.readline(&prompt);
 
-        if status == process::exit::EXIT_CODE {
-            return Ok(());
+        match readline {
+            Ok(line) => {
+                let tokens = parse_tokens(&line);
+                let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                
+                status = process::execute(&tokens);
+
+                if status == process::exit::EXIT_CODE {
+                    return Ok(());
+                }
+
+                // Append executed line to end of history
+                process::history::append_history(unix_timestamp, status, &line);
+            },
+            Err(rustyline::error::ReadlineError::Interrupted) => {
+                break;
+            },
+            Err(rustyline::error::ReadlineError::Eof) => {
+                break;
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
         }
-
-        // Append executed line to end of history
-        process::history::append_history(unix_timestamp, status, &line);
-
-        line.clear();
     }
+
+    Ok(())
 }
 
-fn generate_prompt(status: &i32) {
+fn generate_prompt(status: &i32) -> String {
     let arrow = 0x27A3;
     let red_text = "\u{1b}[31m";
     let green_text = "\u{1b}[32m";
@@ -44,7 +59,7 @@ fn generate_prompt(status: &i32) {
     let cwd = env::current_dir()
         .expect("Expected to retrieve current path, aborting now.");
 
-    print!("{}{}{}{}{}{}{}{}",
+    let prompt = format!("{}{}{}{}{}{}{}{}",
     purple_text,
     update_cwd(cwd.to_str().expect("Expected a string slice for current path, aborting now")),
     match char::from_u32(0x0020) {
@@ -65,6 +80,8 @@ fn generate_prompt(status: &i32) {
         Some(space) => space,
         None => ' ',
     });
+
+    return prompt;
 }
 
 fn update_cwd(cwd: &str) -> String {
@@ -72,11 +89,6 @@ fn update_cwd(cwd: &str) -> String {
         .expect("Expected HOME environment variable to be set, aborting now."), "~");
 
     return updated_cwd;
-}
-
-fn read_line(line: &mut String) -> Result<(), Box<dyn Error>> {
-    std::io::stdin().read_line(line)?; // including '\n'
-    Ok(())
 }
 
 fn parse_tokens(line: &str) -> Vec<String> {

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 rev_lines = "0.3.0"
+rustyline = "15.0.0"
