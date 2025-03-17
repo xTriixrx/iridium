@@ -1,19 +1,22 @@
 pub mod exit;
 pub mod help;
 pub mod history;
+pub mod welcome;
 
 use std::process::Command;
 
-const BUILTIN_NAMES: [&str; 3] = [
+const BUILTIN_NAMES: [&str; 4] = [
     "exit",
     "help",
     "history",
+    "welcome",
 ];
 
-const BUILTIN_FUNCS: [fn(&[String]) -> i32; 3] = [
+const BUILTIN_FUNCS: [fn(&[String]) -> i32; 4] = [
     exit::exit,
     help::help,
     history::history,
+    welcome::welcome,
 ];
 
 pub fn execute(args: &Vec<String>) -> i32 {
