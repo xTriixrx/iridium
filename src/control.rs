@@ -31,7 +31,9 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
                 }
 
                 // Append executed line to end of history
-                process::history::append_history(unix_timestamp, status, &line);
+                if !line.is_empty() {
+                    process::history::append_history(unix_timestamp, status, &line);
+                }
             },
             Err(rustyline::error::ReadlineError::Interrupted) => {
                 break;
