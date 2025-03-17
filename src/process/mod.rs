@@ -36,10 +36,17 @@ pub fn execute(args: &Vec<String>) -> i32 {
 }
 
 fn launch(args: &Vec<String>) -> i32 {
-    let mut child = Command::new(&args[0])
+    let mut res = Command::new(&args[0])
         .args(&args[1..])
-        .spawn()
-        .expect("Failed to execute child process, aborting now.");
+        .spawn();
+    
+    let mut child = match res {
+        Ok(child) => child,
+        Err(_e) => {
+            eprintln!("iridium: command not found: {}", &args[0]);
+            return 1;
+        }
+    };
 
     let ecode = child.wait().expect("Failed to wait on child process, aborting now.");
     ecode.code().expect("Expected an exit code from spawned child process, aborting now.")
