@@ -1,4 +1,4 @@
-pub fn welcome(_args: &[String]) -> i32 {
+pub fn welcome(_args: &[String]) -> Option<i32> {
     let purple_text = "\u{1b}[35m";
     let end_color_text = "\u{1b}[39m";
     let mut title = String::from("");
@@ -27,5 +27,5 @@ pub fn welcome(_args: &[String]) -> i32 {
     title.push_str(end_color_text);
 
     println!("{}", title);
-    return 0;
+    return Some(0);
 }

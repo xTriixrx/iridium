@@ -2,11 +2,11 @@ use std::env;
 use std::path::{Path, PathBuf};
 use crate::process::BUILTIN_NAMES;
 
-pub fn which(args: &[String]) -> i32 {
+pub fn which(args: &[String]) -> Option<i32> {
     // Check if command is a built in command
     if BUILTIN_NAMES.contains(&args[0].as_str()) {
         println!("{}: shell built-in command", args[0]);
-        return 0;
+        return Some(0);
     }
 
     // Create path value for prog string that was provided to 'which' and get PATH as string
@@ -15,7 +15,7 @@ pub fn which(args: &[String]) -> i32 {
         Ok(path_env) => path_env,
         Err(_e) => {
             eprintln!("{} not found", &args[0]);
-            return 1;
+            return None;
         },
     };
 
@@ -31,11 +31,11 @@ pub fn which(args: &[String]) -> i32 {
         // If program file has been found, report path and return
         if path_buf.is_file() {
             println!("{}", path_buf.to_str().unwrap());
-            return 0;
+            return Some(0);
         }
     }
 
     // Program was not found, report and return failure
     eprintln!("{} not found", &args[0]);
-    return 1;
+    return None;
 }

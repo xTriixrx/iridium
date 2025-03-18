@@ -1,3 +1,3 @@
-pub fn help(args: &[String]) -> i32 {
-    return 0;
+pub fn help(_args: &[String]) -> Option<i32> {
+    return Some(0);
 }

@@ -1,20 +1,23 @@
-use crate::process;
 
 use std::env;
 use std::error::Error;
 use std::io::{self, Write};
 use rustyline::{self, DefaultEditor};
+use crate::process::{self, BuiltInMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn control_loop() -> Result<(),  Box<dyn Error>> {
-    let mut status: i32 = 0;
     let stdin = io::stdin();
+    let mut status: Option<i32> = Some(0);
     let mut stdout = io::stdout();
     let mut rustyline = DefaultEditor::new().unwrap();
+
+    let mut builtin_map = BuiltInMap::new();
+    process::populate_func_map(&mut builtin_map);
     
     // Main command control loop for processing commands
     loop {
-        let prompt = generate_prompt(&status);
+        let prompt = generate_prompt(status);
         let _ = stdout.flush();
         
         let readline = rustyline.readline(&prompt);
@@ -24,9 +27,9 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
                 let tokens = parse_tokens(&line);
                 let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 
-                status = process::execute(&tokens);
+                status = process::execute(&builtin_map, &tokens);
 
-                if status == process::exit::EXIT_CODE {
+                if status == Some(process::exit::EXIT_CODE) {
                     return Ok(());
                 }
 
@@ -51,7 +54,7 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     Ok(())
 }
 
-fn generate_prompt(status: &i32) -> String {
+fn generate_prompt(status: Option<i32>) -> String {
     let arrow = 0x27A3;
     let red_text = "\u{1b}[31m";
     let green_text = "\u{1b}[32m";
@@ -69,8 +72,8 @@ fn generate_prompt(status: &i32) -> String {
         None => ' ',
     },
     end_color_text,
-    match *status {
-        0 => green_text,
+    match status {
+        Some(0) => green_text,
         _ => red_text,
     },
     match char::from_u32(arrow) {

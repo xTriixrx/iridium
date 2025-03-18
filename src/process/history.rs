@@ -9,9 +9,14 @@ const LINE_ENDING: &'static str = "\r\n";
 #[cfg(not(windows))]
 const LINE_ENDING: &'static str = "\n";
 
-pub fn append_history(timestamp: u64, status: i32, line: &str) {
+pub fn append_history(timestamp: u64, status: Option<i32>, line: &str) {
     let history_file_path = String::from(env::var("HOME").unwrap() +
         "/.iridium_history");
+    
+    let status_code = match status {
+        Some(val) => val,
+        None => 1,
+    };
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -22,18 +27,18 @@ pub fn append_history(timestamp: u64, status: i32, line: &str) {
     let last_char = line.chars().last().unwrap();
 
     if last_char.to_string() == LINE_ENDING {
-        if let Err(e) = write!(file, "{}:{}:{}", timestamp, status, line) {
+        if let Err(e) = write!(file, "{}:{}:{}", timestamp, status_code, line) {
             eprintln!("Unable to write to history file: {}", e);
         }
         return;    
     }
 
-    if let Err(e) = writeln!(file, "{}:{}:{}", timestamp, status, line) {
+    if let Err(e) = writeln!(file, "{}:{}:{}", timestamp, status_code, line) {
         eprintln!("Unable to write to history file: {}", e);
     }
 }
 
-pub fn history(_args: &[String]) -> i32 {
+pub fn history(_args: &[String]) -> Option<i32> {
     let history_file_path = String::from(env::var("HOME").unwrap() +
         "/.iridium_history");
     
@@ -41,7 +46,7 @@ pub fn history(_args: &[String]) -> i32 {
         Ok(file) => file,
         Err(e) => {
             eprintln!("Unable to read history file: {}", e);
-            return 1;
+            return None;
         },
     };
 
@@ -52,7 +57,7 @@ pub fn history(_args: &[String]) -> i32 {
         println!("{} {}", i, cmd);
     }
 
-    return 0;
+    return Some(0);
 }
 
 // Need to clean this up... very rough impl
