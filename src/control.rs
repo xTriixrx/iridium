@@ -1,19 +1,20 @@
 
+use shlex;
 use std::env;
+use crate::process;
 use std::error::Error;
 use std::io::{self, Write};
 use rustyline::{self, DefaultEditor};
-use crate::process::{self, BuiltInMap};
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::process::builtin::map::BuiltinMap;
 
 pub fn control_loop() -> Result<(),  Box<dyn Error>> {
-    let stdin = io::stdin();
     let mut status: Option<i32> = Some(0);
     let mut stdout = io::stdout();
     let mut rustyline = DefaultEditor::new().unwrap();
 
-    let mut builtin_map = BuiltInMap::new();
-    process::populate_func_map(&mut builtin_map);
+    let mut builtin_map = BuiltinMap::new();
+    builtin_map.populate_func_map();
     
     // Main command control loop for processing commands
     loop {
@@ -24,10 +25,13 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
 
         match readline {
             Ok(line) => {
-                let tokens = parse_tokens(&line);
-                let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let mut tokens = parse_tokens(&line);
+                tokens = alias_parser(&mut builtin_map, tokens);
                 
-                status = process::execute(&builtin_map, &tokens);
+                let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+                // println!("Tokens: {:?}", tokens);
+                status = process::execute(&mut builtin_map, &tokens);
 
                 if status == Some(process::exit::EXIT_CODE) {
                     return Ok(());
@@ -52,6 +56,20 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn alias_parser(builtin_map: &mut BuiltinMap, tokens: Vec<String>) -> Vec<String> {
+    let aliases = builtin_map.get_alias();
+    let aliases_borrow = aliases.as_ref().borrow();
+    let alias = tokens.join(" ");
+
+    // Determine if command is an alias, and call alias
+    if aliases_borrow.contains_alias(&alias) {
+        let expansion = aliases_borrow.get_alias_expansion(&alias).unwrap();
+        return parse_tokens(expansion);
+    }
+
+    tokens
 }
 
 fn generate_prompt(status: Option<i32>) -> String {
@@ -97,5 +115,8 @@ fn update_cwd(cwd: &str) -> String {
 }
 
 fn parse_tokens(line: &str) -> Vec<String> {
-    line.split_whitespace().map(str::to_string).collect()
+    match shlex::split(line) {
+        Some(vec) => vec,
+        None => panic!("Unable to parse string: {}", line),
+    }
 }

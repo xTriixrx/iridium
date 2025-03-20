@@ -1,7 +1,7 @@
 mod config;
 mod control;
 mod process;
-use std::{env, error::Error};
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let empty_slice: [String; 0] = [];

@@ -3,11 +3,48 @@ use std::fs::File;
 use std::io::Write;
 use rev_lines::RevLines;
 use std::fs::OpenOptions;
+use crate::process::builtin::Builtin;
 
 #[cfg(windows)]
 const LINE_ENDING: &'static str = "\r\n";
 #[cfg(not(windows))]
 const LINE_ENDING: &'static str = "\n";
+
+pub struct History {
+
+}
+
+impl Builtin for History {
+    fn call(&mut self, _args: &[String]) -> Option<i32> {
+        let history_file_path = String::from(env::var("HOME").unwrap() +
+        "/.iridium_history");
+    
+        let file = match File::open(history_file_path) {
+            Ok(file) => file,
+            Err(e) => {
+                eprintln!("Unable to read history file: {}", e);
+                return None;
+            },
+        };
+
+        let lines = lines_from_file(&file, 100);
+        
+        for (i, line) in lines.into_iter().enumerate() {
+            let cmd: &str = line.split(":").last().unwrap();
+            println!("{} {}", i, cmd);
+        }
+
+        return Some(0);
+    }
+}
+
+impl History {
+    pub fn new() -> Self {
+        History {
+
+        }
+    }    
+}
 
 pub fn append_history(timestamp: u64, status: Option<i32>, line: &str) {
     let history_file_path = String::from(env::var("HOME").unwrap() +
@@ -36,28 +73,6 @@ pub fn append_history(timestamp: u64, status: Option<i32>, line: &str) {
     if let Err(e) = writeln!(file, "{}:{}:{}", timestamp, status_code, line) {
         eprintln!("Unable to write to history file: {}", e);
     }
-}
-
-pub fn history(_args: &[String]) -> Option<i32> {
-    let history_file_path = String::from(env::var("HOME").unwrap() +
-        "/.iridium_history");
-    
-    let file = match File::open(history_file_path) {
-        Ok(file) => file,
-        Err(e) => {
-            eprintln!("Unable to read history file: {}", e);
-            return None;
-        },
-    };
-
-    let lines = lines_from_file(&file, 100);
-    
-    for (i, line) in lines.into_iter().enumerate() {
-        let cmd: &str = line.split(":").last().unwrap();
-        println!("{} {}", i, cmd);
-    }
-
-    return Some(0);
 }
 
 // Need to clean this up... very rough impl
