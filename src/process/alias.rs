@@ -14,8 +14,22 @@ impl Builtin for Alias {
             return Some(0);
         }
 
-        let parts: Vec<&str> = args[0].split("=").collect();
-        self.insert_alias(parts[0], parts[1]);
+        // Iterate through each alias set and determine if it's a new alias or printing an existing one
+        for arg in args {
+            println!("Arg: {}", arg);
+            // If argument only contains a key, print the existing mapping if it exists.
+            if !arg.contains("=") {
+                if self.alias_map.contains_key(arg) {
+                    let expansion = self.alias_map.get(arg).unwrap();
+                    println!("{}={}", arg, expansion);
+                }
+                continue;
+            }
+
+            // If new alias, split on equals and insert alias and it's expansion into map.
+            let parts: Vec<&str> = arg.split("=").collect();
+            self.insert_alias(parts[0], parts[1]);
+        }
     
         return Some(0);
     }
