@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use super::Builtin;
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use crate::process::cd::Cd;
 use std::collections::HashMap;
 use crate::process::exit::Exit;
@@ -8,6 +8,7 @@ use crate::process::help::Help;
 use crate::process::alias::Alias;
 use crate::process::which::Which;
 use crate::process::r#type::Type;
+use crate::process::pushd::Pushd;
 use crate::process::history::History;
 use crate::process::welcome::Welcome;
 
@@ -17,6 +18,7 @@ pub struct BuiltinMap {
     exit: Rc<RefCell<Exit>>,
     help: Rc<RefCell<Help>>,
     history: Rc<RefCell<History>>,
+    pushd: Rc<RefCell<Pushd>>,
     r#type: Rc<RefCell<Type>>,
     welcome: Rc<RefCell<Welcome>>,
     which: Rc<RefCell<Which>>,
@@ -31,6 +33,7 @@ impl BuiltinMap {
             exit: Rc::new(RefCell::new(Exit::new())),
             help: Rc::new(RefCell::new(Help::new())),
             history: Rc::new(RefCell::new(History::new())),
+            pushd: Rc::new(RefCell::new(Pushd::new())),
             r#type: Rc::new(RefCell::new(Type::new())),
             welcome: Rc::new(RefCell::new(Welcome::new())),
             which: Rc::new(RefCell::new(Which::new())),
@@ -53,6 +56,7 @@ impl BuiltinMap {
         self.add("help", self.help.clone());
         self.add("history", self.history.clone());
         self.add("type", self.r#type.clone());
+        self.add("pushd", self.pushd.clone());
         self.add("welcome", self.welcome.clone());
         self.add("which", self.which.clone());
     }
