@@ -1,6 +1,13 @@
 use std::collections::HashMap;
 use crate::process::builtin::Builtin;
 
+// ENV variables used:
+// LANG
+// LC_ALL
+// LC_CTYPE
+// LC_MESSAGES
+// NLSPATH
+// man page: https://www.man7.org/linux/man-pages/man1/alias.1p.html
 pub struct Alias {
     alias_map: HashMap<String, String>,
 }

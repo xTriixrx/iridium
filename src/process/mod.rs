@@ -3,6 +3,7 @@ pub mod exit;
 pub mod help;
 pub mod alias;
 pub mod which;
+pub mod r#type;
 pub mod history;
 pub mod welcome;
 pub mod builtin;

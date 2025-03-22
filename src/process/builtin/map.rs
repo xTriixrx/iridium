@@ -7,6 +7,7 @@ use crate::process::exit::Exit;
 use crate::process::help::Help;
 use crate::process::alias::Alias;
 use crate::process::which::Which;
+use crate::process::r#type::Type;
 use crate::process::history::History;
 use crate::process::welcome::Welcome;
 
@@ -16,6 +17,7 @@ pub struct BuiltinMap {
     exit: Rc<RefCell<Exit>>,
     help: Rc<RefCell<Help>>,
     history: Rc<RefCell<History>>,
+    r#type: Rc<RefCell<Type>>,
     welcome: Rc<RefCell<Welcome>>,
     which: Rc<RefCell<Which>>,
     func_map: HashMap<String, Rc<RefCell<dyn Builtin>>>,
@@ -29,6 +31,7 @@ impl BuiltinMap {
             exit: Rc::new(RefCell::new(Exit::new())),
             help: Rc::new(RefCell::new(Help::new())),
             history: Rc::new(RefCell::new(History::new())),
+            r#type: Rc::new(RefCell::new(Type::new())),
             welcome: Rc::new(RefCell::new(Welcome::new())),
             which: Rc::new(RefCell::new(Which::new())),
             func_map: HashMap::new(),
@@ -49,6 +52,7 @@ impl BuiltinMap {
         self.add("exit", self.exit.clone());
         self.add("help", self.help.clone());
         self.add("history", self.history.clone());
+        self.add("type", self.r#type.clone());
         self.add("welcome", self.welcome.clone());
         self.add("which", self.which.clone());
     }
