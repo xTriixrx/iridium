@@ -23,7 +23,6 @@ impl Builtin for Alias {
 
         // Iterate through each alias set and determine if it's a new alias or printing an existing one
         for arg in args {
-            println!("Arg: {}", arg);
             // If argument only contains a key, print the existing mapping if it exists.
             if !arg.contains("=") {
                 if self.alias_map.contains_key(arg) {
