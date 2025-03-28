@@ -2,6 +2,7 @@ use std::rc::Rc;
 use super::Builtin;
 use std::cell::{Ref, RefCell};
 use crate::process::cd::Cd;
+use crate::process::pwd::Pwd;
 use std::collections::HashMap;
 use crate::process::exit::Exit;
 use crate::process::help::Help;
@@ -19,6 +20,7 @@ pub struct BuiltinMap {
     help: Rc<RefCell<Help>>,
     history: Rc<RefCell<History>>,
     pushd: Rc<RefCell<Pushd>>,
+    pwd: Rc<RefCell<Pwd>>,
     r#type: Rc<RefCell<Type>>,
     welcome: Rc<RefCell<Welcome>>,
     which: Rc<RefCell<Which>>,
@@ -34,6 +36,7 @@ impl BuiltinMap {
             help: Rc::new(RefCell::new(Help::new())),
             history: Rc::new(RefCell::new(History::new())),
             pushd: Rc::new(RefCell::new(Pushd::new())),
+            pwd: Rc::new(RefCell::new(Pwd::new())),
             r#type: Rc::new(RefCell::new(Type::new())),
             welcome: Rc::new(RefCell::new(Welcome::new())),
             which: Rc::new(RefCell::new(Which::new())),
@@ -41,6 +44,7 @@ impl BuiltinMap {
         };
 
         builtin.which.borrow_mut().set_aliases(builtin.alias.clone());
+        builtin.cd.borrow_mut().set_pwd(builtin.pwd.clone());
         return builtin;
     }
 
@@ -57,6 +61,7 @@ impl BuiltinMap {
         self.add("history", self.history.clone());
         self.add("type", self.r#type.clone());
         self.add("pushd", self.pushd.clone());
+        self.add("pwd", self.pwd.clone());
         self.add("welcome", self.welcome.clone());
         self.add("which", self.which.clone());
     }

@@ -1,4 +1,5 @@
 pub mod cd;
+pub mod pwd;
 pub mod exit;
 pub mod help;
 pub mod alias;
