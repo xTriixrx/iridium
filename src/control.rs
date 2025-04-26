@@ -18,7 +18,7 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     
     // Main command control loop for processing commands
     loop {
-        let prompt = generate_prompt(status);
+        let prompt = generate_prompt(status, &builtin_map.get_pwd());
         let _ = stdout.flush();
         
         let readline = rustyline.readline(&prompt);
@@ -72,19 +72,16 @@ fn alias_parser(builtin_map: &mut BuiltinMap, tokens: Vec<String>) -> Vec<String
     tokens
 }
 
-fn generate_prompt(status: Option<i32>) -> String {
+fn generate_prompt(status: Option<i32>, pwd: &String) -> String {
     let arrow = 0x27A3;
     let red_text = "\u{1b}[31m";
     let green_text = "\u{1b}[32m";
     let purple_text = "\u{1b}[35m";
     let end_color_text = "\u{1b}[39m";
-    
-    let cwd = env::current_dir()
-        .expect("Expected to retrieve current path, aborting now.");
 
     let prompt = format!("{}{}{}{}{}{}{}{}",
     purple_text,
-    update_cwd(cwd.to_str().expect("Expected a string slice for current path, aborting now")),
+    update_cwd(pwd),
     match char::from_u32(0x0020) {
         Some(space) => space,
         None => ' ',

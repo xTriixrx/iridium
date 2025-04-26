@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 use super::builtin::Builtin;
 
 /// The 'pwd' built-in command follows the IEEE 1003.1-2017 standard.
@@ -35,9 +36,6 @@ use super::builtin::Builtin;
 /// 
 /// If both -L and -P are specified, the last one shall apply. If neither -L nor -P is specified,
 /// the pwd utility shall behave as if -L had been specified.
-/// 
-/// # TODO
-/// Need to figure out how to implement and test -L -P options appropriately.
 pub struct Pwd {
     
 }
@@ -63,12 +61,20 @@ impl Builtin for Pwd {
             options.push(arg);
         }
 
-        // Get current pwd
-        if options.is_empty() {
-            let pwd = self.get_pwd();
-            println!("{}", pwd);
+        if options.iter().any(|&option| option == "-P") {
+            let pwd_val = self.get_pwd();
+            let path = Path::new(&pwd_val);
+            let pwd = match path.canonicalize() {
+                Ok(pwd) => pwd,
+                Err(e) => panic!("Error canonicalizing path: {}, {}", pwd_val, e),
+            };
+
+            println!("{}", pwd.to_str().unwrap());
+            return Some(0);
         }
 
+        let pwd = self.get_pwd();
+        println!("{}", pwd);
         Some(0)
     }
 }

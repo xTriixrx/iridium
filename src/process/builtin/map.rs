@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use super::Builtin;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use crate::process::cd::Cd;
 use crate::process::pwd::Pwd;
 use std::collections::HashMap;
@@ -68,6 +68,10 @@ impl BuiltinMap {
 
     pub fn get_alias(&self) -> Rc<RefCell<Alias>> {
         self.alias.clone()
+    }
+
+    pub fn get_pwd(&self) -> String {
+        String::from(self.pwd.as_ref().borrow().get_pwd())
     }
 
     pub fn get(&mut self, func_name: &str) -> Option<&mut Rc<RefCell<dyn Builtin>>> {
