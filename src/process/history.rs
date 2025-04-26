@@ -27,8 +27,8 @@ impl Builtin for History {
             },
         };
 
-        let lines = lines_from_file(&file, 100);
-        
+        let mut lines = lines_from_file(&file, 1000);
+        lines.reverse();
         for (i, line) in lines.into_iter().enumerate() {
             let cmd: &str = line.split(":").last().unwrap();
             println!("{} {}", i, cmd);
