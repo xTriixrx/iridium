@@ -1,8 +1,6 @@
 use crate::process::builtin::Builtin;
 
-pub struct Pushd {
-
-}
+pub struct Pushd {}
 
 impl Builtin for Pushd {
     fn call(&mut self, args: &[String]) -> Option<i32> {
@@ -13,8 +11,6 @@ impl Builtin for Pushd {
 
 impl Pushd {
     pub fn new() -> Self {
-        Pushd {
-
-        }
+        Pushd {}
     }
 }

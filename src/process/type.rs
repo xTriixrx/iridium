@@ -14,9 +14,7 @@ use crate::process::builtin::Builtin;
 // -P Forces a PATH search for each name, even if 'type -t name' would not return file.
 //      If a command is hashed, -p and -P print the hashed value, not necessarily the file that appears first in PATH.
 // With no options, indicate how each name would be interpreted if used as a command name.
-pub struct Type {
-
-}
+pub struct Type {}
 
 impl Builtin for Type {
     fn call(&mut self, args: &[String]) -> Option<i32> {
@@ -27,8 +25,6 @@ impl Builtin for Type {
 
 impl Type {
     pub fn new() -> Self {
-        Type {
-
-        }
+        Type {}
     }
 }

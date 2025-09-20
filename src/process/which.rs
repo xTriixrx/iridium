@@ -1,10 +1,10 @@
-use std::env;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::path::{Path, PathBuf};
 use crate::process::alias::Alias;
-use crate::process::builtin::Builtin;
 use crate::process::builtin::BUILTIN_NAMES;
+use crate::process::builtin::Builtin;
+use std::cell::RefCell;
+use std::env;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 pub struct Which {
     aliases: Option<Rc<RefCell<Alias>>>,
@@ -37,7 +37,7 @@ impl Builtin for Which {
             Err(_e) => {
                 eprintln!("{} not found", &args[0]);
                 return None;
-            },
+            }
         };
 
         // Split PATH string on colon to generate iterator
@@ -64,9 +64,7 @@ impl Builtin for Which {
 
 impl Which {
     pub fn new() -> Self {
-        Which {
-            aliases: None,
-        }
+        Which { aliases: None }
     }
 
     pub fn set_aliases(&mut self, aliases: Rc<RefCell<Alias>>) {

@@ -1,23 +1,23 @@
+use super::builtin::Builtin;
 use std::env;
 use std::path::Path;
-use super::builtin::Builtin;
 
 /// The 'pwd' built-in command follows the IEEE 1003.1-2017 standard.
-/// 
+///
 /// # Name
 /// pwd - return working directory name
-/// 
+///
 /// # Synopsis
 /// pwd [-L|-P]
-/// 
+///
 /// # Description
 /// The pwd utility shall write to the standard output an absolute pathname of the current working
 /// directory, which does not contain the filenames dot or dot-dot.
-/// 
+///
 /// # Options
 /// The pwd utility shall conform to the XBD Utility Syntax Guidelines.
 /// The following options shall be supported by the implementation:
-/// 
+///
 /// #### -L
 /// If the PWD environment variable contains an absolute pathname of the current directory and the
 /// pathname does not contain any components that are dot or dot-dot, pwd shall write this pathname
@@ -25,7 +25,7 @@ use super::builtin::Builtin;
 /// including the terminating null, it is unspecified whether pwd writes this pathname to standard
 /// output or behaves as if the -P option had been specified. Otherwise, the -L option shall behave
 /// as the -P option.
-/// 
+///
 /// #### -P
 /// The pathname written to standard output shall not contain any components that refer to files of
 /// type symbolic link. If there are multiple pathnames that the pwd utility could write to standard
@@ -33,16 +33,14 @@ use super::builtin::Builtin;
 /// characters, then it shall write the pathname beginning with a single <slash> character. The
 /// pathname shall not contain any unnecessary <slash> characters after the leading one or two
 /// <slash> characters.
-/// 
+///
 /// If both -L and -P are specified, the last one shall apply. If neither -L nor -P is specified,
 /// the pwd utility shall behave as if -L had been specified.
-pub struct Pwd {
-    
-}
+pub struct Pwd {}
 
 impl Builtin for Pwd {
     fn call(&mut self, args: &[String]) -> Option<i32> {
-        let mut options: Vec<&String>  = Vec::new();
+        let mut options: Vec<&String> = Vec::new();
 
         // Iterate through all arguments and categorize references into options and arguments
         for arg in args {
@@ -81,9 +79,7 @@ impl Builtin for Pwd {
 
 impl Pwd {
     pub fn new() -> Self {
-        Pwd {
-            
-        }
+        Pwd {}
     }
 
     pub fn get_pwd(&self) -> String {
@@ -94,6 +90,6 @@ impl Pwd {
 fn get_pwd() -> String {
     match env::var("PWD") {
         Ok(pwd) => pwd,
-        Err(_e) => String::from(""),   
+        Err(_e) => String::from(""),
     }
 }

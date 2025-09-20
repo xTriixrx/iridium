@@ -1,17 +1,17 @@
-use std::fs;
-use std::env;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::path::PathBuf;
+use crate::process::builtin::Builtin;
 use crate::process::pwd::Pwd;
 use normalize_path::NormalizePath;
-use crate::process::builtin::Builtin;
+use std::cell::RefCell;
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 /// The cd built-in command follows the IEEE 1003.1-2017 standard.
-/// 
+///
 /// # Name
 /// cd - change the working directory
-/// 
+///
 /// # Synopsis
 /// cd [-L|-P] [directory]
 /// cd -
@@ -20,10 +20,10 @@ pub struct Cd {
 }
 
 ///
-/// 
+///
 impl Builtin for Cd {
     ///
-    /// 
+    ///
     fn call(&mut self, args: &[String]) -> Option<i32> {
         // Get HOME env variable
         let mut home = match env::var("HOME") {
@@ -63,12 +63,10 @@ impl Builtin for Cd {
 }
 
 ///
-/// 
+///
 impl Cd {
     pub fn new() -> Self {
-        Cd {
-            pwd: None,
-        }
+        Cd { pwd: None }
     }
 
     pub fn set_pwd(&mut self, pwd: Rc<RefCell<Pwd>>) {
@@ -87,8 +85,10 @@ fn set_dir(path: &mut String) -> Option<i32> {
 
     // If provided path contains "~", replace with home value.
     if path.contains("~") {
-        modpath = path.replace("~", &env::var("HOME")
-            .expect("Expected HOME environment variable to be set, aborting now."));
+        modpath = path.replace(
+            "~",
+            &env::var("HOME").expect("Expected HOME environment variable to be set, aborting now."),
+        );
     }
 
     // Create new path based off cwd and path provided
@@ -100,23 +100,22 @@ fn set_dir(path: &mut String) -> Option<i32> {
     // If path is a symbolic link, normalize path
     if new_path.is_symlink() {
         new_path.normalize();
-    }
-    else { // Otherwise, get full canonical path of new directory
+    } else {
+        // Otherwise, get full canonical path of new directory
         new_path = match fs::canonicalize(new_path) {
             Ok(canonical) => canonical,
             Err(_e) => {
                 eprintln!("cd: no such file or directory: {}", path);
                 return Some(1);
-            },
+            }
         };
     }
-//cd: no such file or directory: blah
+    //cd: no such file or directory: blah
     // Change current directory using canonical path
     update_path(new_path)
-    
 }
 
-fn update_path(new_path: PathBuf) -> Option<i32>{
+fn update_path(new_path: PathBuf) -> Option<i32> {
     // Get current path before changing directories
     let cur_path = match env::current_dir() {
         Ok(cur) => cur,
@@ -125,16 +124,21 @@ fn update_path(new_path: PathBuf) -> Option<i32>{
 
     // Set new path and update OLDPWD & PWD env vars
     match env::set_current_dir(&new_path) {
-        Ok(_) => return {
-            unsafe {
-                env::set_var("OLDPWD", cur_path);
-                env::set_var("PWD", new_path);
-            }
+        Ok(_) => {
+            return {
+                unsafe {
+                    env::set_var("OLDPWD", cur_path);
+                    env::set_var("PWD", new_path);
+                }
 
-            Some(0)
-        },
+                Some(0)
+            };
+        }
         Err(_e) => {
-            eprintln!("cd: no such file or directory: {}", &new_path.to_str().unwrap());
+            eprintln!(
+                "cd: no such file or directory: {}",
+                &new_path.to_str().unwrap()
+            );
             return None;
         }
     }

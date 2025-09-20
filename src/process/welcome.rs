@@ -1,8 +1,7 @@
 use crate::process::builtin::Builtin;
+use terminal_size::{Width, terminal_size};
 
-pub struct Welcome {
-
-}
+pub struct Welcome {}
 
 impl Builtin for Welcome {
     fn call(&mut self, args: &[String]) -> Option<i32> {
@@ -12,40 +11,61 @@ impl Builtin for Welcome {
 
 impl Welcome {
     pub fn new() -> Self {
-        Welcome {
-
-        }
+        Welcome {}
     }
 }
 
 pub fn welcome(_args: &[String]) -> Option<i32> {
+    const DEFAULT_WIDTH: usize = 80;
+    let width = terminal_size()
+        .and_then(|(Width(w), _)| usize::try_from(w).ok())
+        .filter(|w| *w > 0)
+        .unwrap_or(DEFAULT_WIDTH);
+
+    let heading = [
+        " _       __     __                              __      ",
+        "| |     / /__  / /________  ____ ___  ___      / /_____ ",
+        "| | /| / / _ \\/ / ___/ __ \\/ __ `__ \\/ _ \\    / __/ __ \\",
+        "| |/ |/ /  __/ / /__/ /_/ / / / / / /  __/   / /_/ /_/ /",
+        "|__/|__/\\___/_/\\___/\\____/_/ /_/ /_/\\___/    \\__/\\____/ ",
+    ];
+
+    let iridium_msg = [
+        "   ██▓ ██▀███   ██▓▓█████▄  ██▓ █    ██  ███▄ ▄███▓",
+        "  ▓██▒▓██ ▒ ██▒▓██▒▒██▀ ██▌▓██▒ ██  ▓██▒▓██▒▀█▀ ██▒",
+        "  ▒██▒▓██ ░▄█ ▒▒██▒░██   █▌▒██▒▓██  ▒██░▓██    ▓██░",
+        "  ░██░▒██▀▀█▄  ░██░░▓█▄   ▌░██░▓▓█  ░██░▒██    ▒██ ",
+        "  ░██░░██▓ ▒██▒░██░░▒████▓ ░██░▒▒█████▓ ▒██▒   ░██▒",
+        "  ░▓  ░ ▒▓ ░▒▓░░▓   ▒▒▓  ▒ ░▓  ░▒▓▒ ▒ ▒ ░ ▒░   ░  ░",
+        "   ▒ ░  ░▒ ░ ▒░ ▒ ░ ░ ▒  ▒  ▒ ░░░▒░ ░ ░ ░  ░      ░",
+        "   ▒ ░  ░░   ░  ▒ ░ ░ ░  ░  ▒ ░ ░░░ ░ ░ ░      ░   ",
+        "  ░     ░      ░     ░     ░     ░            ░    ",
+        "                    ░                              ",
+    ];
+
     let purple_text = "\u{1b}[35m";
     let end_color_text = "\u{1b}[39m";
-    let mut title = String::from("");
 
-    // Welcome to title sign
-    title.push_str(" _       __     __                              __      \n");
-    title.push_str("| |     / /__  / /________  ____ ___  ___      / /_____ \n");
-    title.push_str("| | /| / / _ \\/ / ___/ __ \\/ __ `__ \\/ _ \\    / __/ __ \\\n");
-    title.push_str("| |/ |/ /  __/ / /__/ /_/ / / / / / /  __/   / /_/ /_/ /\n");
-    title.push_str("|__/|__/\\___/_/\\___/\\____/_/ /_/ /_/\\___/    \\__/\\____/ \n\n");
+    for line in heading {
+        println!("{}", center_line(line, width));
+    }
+    println!();
+    for line in iridium_msg {
+        let padded_line = center_line(line, width);
+        println!("{}{}{}", purple_text, padded_line, end_color_text);
+    }
 
-    
-    title.push_str(purple_text);
+    Some(0)
+}
 
-    title.push_str("   ██▓ ██▀███   ██▓▓█████▄  ██▓ █    ██  ███▄ ▄███▓\n");
-    title.push_str("  ▓██▒▓██ ▒ ██▒▓██▒▒██▀ ██▌▓██▒ ██  ▓██▒▓██▒▀█▀ ██▒\n");
-    title.push_str("  ▒██▒▓██ ░▄█ ▒▒██▒░██   █▌▒██▒▓██  ▒██░▓██    ▓██░\n");
-    title.push_str("  ░██░▒██▀▀█▄  ░██░░▓█▄   ▌░██░▓▓█  ░██░▒██    ▒██ \n");
-    title.push_str("  ░██░░██▓ ▒██▒░██░░▒████▓ ░██░▒▒█████▓ ▒██▒   ░██▒\n");
-    title.push_str("  ░▓  ░ ▒▓ ░▒▓░░▓   ▒▒▓  ▒ ░▓  ░▒▓▒ ▒ ▒ ░ ▒░   ░  ░\n");
-    title.push_str("   ▒ ░  ░▒ ░ ▒░ ▒ ░ ░ ▒  ▒  ▒ ░░░▒░ ░ ░ ░  ░      ░\n");
-    title.push_str("   ▒ ░  ░░   ░  ▒ ░ ░ ░  ░  ▒ ░ ░░░ ░ ░ ░      ░   \n");
-    title.push_str("  ░     ░      ░     ░     ░     ░            ░    \n");
-    title.push_str("                    ░                              \n");
-    
-    title.push_str(end_color_text);
-
-    println!("{}", title);
-    return Some(0);
+fn center_line(text: &str, width: usize) -> String {
+    let len = text.chars().count();
+    if width <= len {
+        return text.to_string();
+    }
+    let padding = (width - len) / 2;
+    let mut line = String::with_capacity(padding + len);
+    line.extend(std::iter::repeat(' ').take(padding));
+    line.push_str(text);
+    line
 }

@@ -1,55 +1,50 @@
-
-use shlex;
-use std::env;
-use crate::process;
-use std::error::Error;
 use std::io::{self, Write};
-use rustyline::{self, DefaultEditor};
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::process::builtin::map::BuiltinMap;
+use rustyline::error::ReadlineError;
+use crate::control_state::ControlFlow;
+use crate::control_state::ControlState;
+use rustyline::history::DefaultHistory;
+use crate::complete::helper::IridiumHelper;
+use crate::complete::handler::TabEventHandler;
+use crate::complete::hinter::CompleteHintHandler;
+use crate::complete::history::load_history_entries;
+use rustyline::{hint::HistoryHinter, history::FileHistory};
+use rustyline::{Cmd, Editor, Event, EventHandler, KeyEvent, Result};
 
-pub fn control_loop() -> Result<(),  Box<dyn Error>> {
-    let mut status: Option<i32> = Some(0);
+pub fn control_loop() -> Result<()> {
     let mut stdout = io::stdout();
-    let mut rustyline = DefaultEditor::new().unwrap();
-
-    let mut builtin_map = BuiltinMap::new();
-    builtin_map.populate_func_map();
+    let mut control_state = ControlState::new();
+    let mut rl = Editor::<IridiumHelper, DefaultHistory>::new()?;
     
-    // Main command control loop for processing commands
+    // Set the custom helper callback
+    rl.set_helper(Some(IridiumHelper::new(HistoryHinter::new())));
+
+    // Loads iridium history file into context
+    load_history(&mut rl);
+
+    // Binds hinter & tab completion to key events
+    bind_handlers(&mut rl);
+
     loop {
-        let prompt = generate_prompt(status, &builtin_map.get_pwd());
+        let prompt = control_state.prompt();
         let _ = stdout.flush();
-        
-        let readline = rustyline.readline(&prompt);
 
-        match readline {
+        match rl.readline(&prompt) {
             Ok(line) => {
-                let mut tokens = parse_tokens(&line);
-                tokens = alias_parser(&mut builtin_map, tokens);
-                
-                let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-
-                // println!("Tokens: {:?}", tokens);
-                status = process::execute(&mut builtin_map, &tokens);
-
-                if status == Some(process::exit::EXIT_CODE) {
-                    return Ok(());
-                }
-
-                // Append executed line to end of history
                 if !line.is_empty() {
-                    process::history::append_history(unix_timestamp, status, &line);
+                    if let Err(err) = rl.add_history_entry(line.as_str()) {
+                        eprintln!("Warning: unable to record line in history: {err}");
+                    }
                 }
-            },
-            Err(rustyline::error::ReadlineError::Interrupted) => {
+
+                if let ControlFlow::EXIT = control_state.handle_line(&line) {
+                    break;
+                }
+            }
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                 break;
-            },
-            Err(rustyline::error::ReadlineError::Eof) => {
-                break;
-            },
+            }
             Err(err) => {
-                println!("Error: {:?}", err);
+                eprintln!("Error: {err}");
                 break;
             }
         }
@@ -58,62 +53,37 @@ pub fn control_loop() -> Result<(),  Box<dyn Error>> {
     Ok(())
 }
 
-fn alias_parser(builtin_map: &mut BuiltinMap, tokens: Vec<String>) -> Vec<String> {
-    let aliases = builtin_map.get_alias();
-    let aliases_borrow = aliases.as_ref().borrow();
-    let alias = tokens.join(" ");
+fn bind_handlers(rl: &mut Editor<IridiumHelper, FileHistory>) {
+    let ceh = Box::new(CompleteHintHandler::new());
 
-    // Determine if command is an alias, and call alias
-    if aliases_borrow.contains_alias(&alias) {
-        let expansion = aliases_borrow.get_alias_expansion(&alias).unwrap();
-        return parse_tokens(expansion);
-    }
-
-    tokens
+    //
+    rl.bind_sequence(KeyEvent::ctrl('b'), EventHandler::Conditional(ceh.clone()));
+    
+    //
+    rl.bind_sequence(KeyEvent::alt('f'), EventHandler::Conditional(ceh));
+    
+    //
+    rl.bind_sequence(
+        KeyEvent::from('\t'),
+        EventHandler::Conditional(Box::new(TabEventHandler::new())));
+    
+    //
+    rl.bind_sequence(
+        Event::KeySeq(vec![KeyEvent::ctrl('X'), KeyEvent::ctrl('E')]),
+        EventHandler::Simple(Cmd::Suspend));
 }
 
-fn generate_prompt(status: Option<i32>, pwd: &String) -> String {
-    let arrow = 0x27A3;
-    let red_text = "\u{1b}[31m";
-    let green_text = "\u{1b}[32m";
-    let purple_text = "\u{1b}[35m";
-    let end_color_text = "\u{1b}[39m";
-
-    let prompt = format!("{}{}{}{}{}{}{}{}",
-    purple_text,
-    update_cwd(pwd),
-    match char::from_u32(0x0020) {
-        Some(space) => space,
-        None => ' ',
-    },
-    end_color_text,
-    match status {
-        Some(0) => green_text,
-        _ => red_text,
-    },
-    match char::from_u32(arrow) {
-        Some(arrow) => arrow,
-        None => '>',
-    },
-    end_color_text,
-    match char::from_u32(0x0020) {
-        Some(space) => space,
-        None => ' ',
-    });
-
-    return prompt;
-}
-
-fn update_cwd(cwd: &str) -> String {
-    let updated_cwd = cwd.replace(&env::var("HOME")
-        .expect("Expected HOME environment variable to be set, aborting now."), "~");
-
-    return updated_cwd;
-}
-
-fn parse_tokens(line: &str) -> Vec<String> {
-    match shlex::split(line) {
-        Some(vec) => vec,
-        None => panic!("Unable to parse string: {}", line),
+fn load_history(rl: &mut Editor<IridiumHelper, FileHistory>) {
+    match load_history_entries(None) {
+        Ok(history) => {
+            for entry in history {
+                if let Err(err) = rl.add_history_entry(entry.as_str()) {
+                    eprintln!("Warning: unable to record persisted history entry: {err}");
+                }
+            }
+        }
+        Err(err) => {
+            eprintln!("Warning: unable to load history hints: {err}");
+        }
     }
 }

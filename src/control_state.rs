@@ -1,0 +1,112 @@
+use shlex;
+use std::env;
+use crate::process;
+use std::time::{SystemTime, UNIX_EPOCH};
+use crate::process::builtin::map::BuiltinMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlFlow {
+    CONTINUE,
+    EXIT,
+}
+
+pub struct ControlState {
+    status: Option<i32>,
+    builtin_map: BuiltinMap,
+}
+
+impl ControlState {
+    pub fn new() -> Self {
+        let mut builtin_map = BuiltinMap::new();
+        builtin_map.populate_func_map();
+        Self {
+            status: Some(0),
+            builtin_map,
+        }
+    }
+
+    pub fn prompt(&self) -> String {
+        generate_prompt(self.status, &self.builtin_map.get_pwd())
+    }
+
+    pub fn handle_line(&mut self, line: &str) -> ControlFlow {
+        let mut tokens = parse_tokens(line);
+        tokens = alias_parser(&mut self.builtin_map, tokens);
+
+        let unix_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.status = process::execute(&mut self.builtin_map, &tokens);
+
+        if !line.is_empty() {
+            process::history::append_history(unix_timestamp, self.status, line);
+        }
+
+        if self.status == Some(process::exit::EXIT_CODE) {
+            ControlFlow::EXIT
+        } else {
+            ControlFlow::CONTINUE
+        }
+    }
+}
+
+fn generate_prompt(status: Option<i32>, pwd: &String) -> String {
+    let arrow = 0x27A3;
+    let red_text = "\u{1b}[31m";
+    let green_text = "\u{1b}[32m";
+    let purple_text = "\u{1b}[35m";
+    let end_color_text = "\u{1b}[39m";
+
+    format!(
+        "{}{}{}{}{}{}{}{}",
+        purple_text,
+        update_cwd(pwd),
+        match char::from_u32(0x0020) {
+            Some(space) => space,
+            None => ' ',
+        },
+        end_color_text,
+        match status {
+            Some(0) => green_text,
+            _ => red_text,
+        },
+        match char::from_u32(arrow) {
+            Some(arrow) => arrow,
+            None => '>',
+        },
+        end_color_text,
+        match char::from_u32(0x0020) {
+            Some(space) => space,
+            None => ' ',
+        }
+    )
+}
+
+fn alias_parser(builtin_map: &mut BuiltinMap, tokens: Vec<String>) -> Vec<String> {
+    let aliases = builtin_map.get_alias();
+    let aliases_borrow = aliases.as_ref().borrow();
+    let alias = tokens.join(" ");
+
+    if aliases_borrow.contains_alias(&alias) {
+        let expansion = aliases_borrow.get_alias_expansion(&alias).unwrap();
+        return parse_tokens(expansion);
+    }
+
+    tokens
+}
+
+fn update_cwd(cwd: &str) -> String {
+    cwd.replace(
+        &env::var("HOME").expect("Expected HOME environment variable to be set, aborting now."),
+        "~",
+    )
+}
+
+fn parse_tokens(line: &str) -> Vec<String> {
+    match shlex::split(line) {
+        Some(vec) => vec,
+        None => panic!("Unable to parse string: {}", line),
+    }
+}

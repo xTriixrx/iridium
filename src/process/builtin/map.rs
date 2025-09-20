@@ -1,17 +1,17 @@
-use std::rc::Rc;
 use super::Builtin;
-use std::cell::RefCell;
+use crate::process::alias::Alias;
 use crate::process::cd::Cd;
-use crate::process::pwd::Pwd;
-use std::collections::HashMap;
 use crate::process::exit::Exit;
 use crate::process::help::Help;
-use crate::process::alias::Alias;
-use crate::process::which::Which;
-use crate::process::r#type::Type;
-use crate::process::pushd::Pushd;
 use crate::process::history::History;
+use crate::process::pushd::Pushd;
+use crate::process::pwd::Pwd;
+use crate::process::r#type::Type;
 use crate::process::welcome::Welcome;
+use crate::process::which::Which;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 pub struct BuiltinMap {
     alias: Rc<RefCell<Alias>>,
@@ -43,7 +43,10 @@ impl BuiltinMap {
             func_map: HashMap::new(),
         };
 
-        builtin.which.borrow_mut().set_aliases(builtin.alias.clone());
+        builtin
+            .which
+            .borrow_mut()
+            .set_aliases(builtin.alias.clone());
         builtin.cd.borrow_mut().set_pwd(builtin.pwd.clone());
         return builtin;
     }
@@ -53,7 +56,7 @@ impl BuiltinMap {
         if !self.is_empty() {
             return;
         }
-        
+
         self.add("alias", self.alias.clone());
         self.add("cd", self.cd.clone());
         self.add("exit", self.exit.clone());

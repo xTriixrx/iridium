@@ -1,16 +1,16 @@
 mod config;
 mod control;
 mod process;
-use std::error::Error;
+mod complete;
+mod control_state;
 
-fn main() -> Result<(), Box<dyn Error>> {
+use rustyline::Result;
+
+fn main() -> Result<()> {
     let empty_slice: [String; 0] = [];
     
-    // Load config files, if any.
+    // Perform welcome message
     process::welcome::welcome(&empty_slice);
 
-    // Run command loop.
-    control::control_loop()?;
-
-    return Ok(())
+    control::control_loop()
 }

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::process::builtin::Builtin;
+use std::collections::HashMap;
 
 // ENV variables used:
 // LANG
@@ -36,7 +36,7 @@ impl Builtin for Alias {
             let parts: Vec<&str> = arg.split("=").collect();
             self.insert_alias(parts[0], parts[1]);
         }
-    
+
         return Some(0);
     }
 }
@@ -49,7 +49,8 @@ impl Alias {
     }
 
     fn insert_alias(&mut self, alias_name: &str, expansion: &str) -> Option<String> {
-        self.alias_map.insert(alias_name.to_string(), expansion.to_string())
+        self.alias_map
+            .insert(alias_name.to_string(), expansion.to_string())
     }
 
     pub fn contains_alias(&self, alias_name: &str) -> bool {
