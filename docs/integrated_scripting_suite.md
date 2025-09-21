@@ -149,6 +149,7 @@ function ExecutionBridge.execute(script: ScriptPayload, options: ExecOptions) ->
 - `macros`: array of `{ id, name, signature, body, metadata, versionHistory }`
 - `user_settings`: prompt themes, default buffer, last active pipeline, etc.
 - `runtime_info`: last run timestamps, aggregated metrics (optional).
+- `pipeline_buffer_links`: array tracing relationships between pipelines, active buffers, and saved states.
 
 ### Save Triggers
 
@@ -163,6 +164,77 @@ function ExecutionBridge.execute(script: ScriptPayload, options: ExecOptions) ->
 2. Apply migrations if schema version mismatches.
 3. Rebuild indexes and dependency graphs.
 4. Prime macro usage metrics and pipeline lint caches.
+
+### Pipeline–Buffer Traceability Structure
+
+To provide first-class traceability between pipelines, buffers, and their persisted state, the model introduces a dedicated `PipelineBufferLink` artifact stored alongside core state components. Each link captures the pipeline identity, any buffer currently derived from or editing that pipeline, and version metadata needed to recover the user’s workspace.
+
+```rust
+pub struct PipelineBufferLink {
+    pub pipeline_id: PipelineId,
+    pub buffer_id: Option<BufferId>,
+    pub buffer_snapshot: Option<BufferSnapshot>,
+    pub last_saved_version: VersionId,
+    pub last_active_at: DateTime<Utc>,
+    pub labels: Vec<String>,
+}
+
+pub struct BufferSnapshot {
+    pub body: Vec<String>,
+    pub metadata: BufferMetadata,
+    pub persisted_at: DateTime<Utc>,
+}
+
+pub struct PipelineTraceIndex {
+    pub links: HashMap<PipelineId, PipelineBufferLink>,
+}
+
+impl PipelineTraceIndex {
+    pub fn record_activity(
+        &mut self,
+        pipeline_id: PipelineId,
+        buffer: Option<&Buffer>,
+        version: VersionId,
+    ) {
+        // update or insert trace entry with latest snapshot information
+    }
+}
+```
+
+The persistence layer serializes these trace links using a JSON representation compliant with the broader snapshot schema. An example excerpt follows:
+
+```json
+{
+  "pipeline_buffer_links": [
+    {
+      "pipeline_id": "deploy",
+      "buffer_id": "buffer-42",
+      "buffer_snapshot": {
+        "body": [
+          "#!/bin/sh",
+          "echo Deploying ${app} to ${env}"
+        ],
+        "metadata": {
+          "created_at": "2024-01-03T18:42:11Z",
+          "updated_at": "2024-01-05T09:15:00Z",
+          "last_exit": 0,
+          "autosave_path": "~/.iridium/autosave/buffer-42",
+          "origin": {
+            "kind": "Pipeline",
+            "id": "deploy"
+          }
+        },
+        "persisted_at": "2024-01-05T09:15:05Z"
+      },
+      "last_saved_version": 7,
+      "last_active_at": "2024-01-05T09:16:11Z",
+      "labels": ["staging", "blue-green"]
+    }
+  ]
+}
+```
+
+During hydration the `PipelineTraceIndex` reconstructs active buffer associations, allowing the shell to reopen editing sessions automatically or identify orphaned buffers that no longer correspond to a known pipeline version.
 
 ## Pipeline Execution with Macro Expansion
 
