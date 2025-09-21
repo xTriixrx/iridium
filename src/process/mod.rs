@@ -1,3 +1,5 @@
+//! Shell builtin implementations and process execution helpers.
+
 pub mod alias;
 pub mod builtin;
 pub mod cd;
@@ -12,24 +14,22 @@ pub mod which;
 use crate::process::builtin::map::BuiltinMap;
 use std::process::Command;
 
-pub fn execute(builtin_map: &mut BuiltinMap, args: &Vec<String>) -> Option<i32> {
+/// Execute a command, dispatching to builtins or spawning external processes.
+pub fn execute(builtin_map: &BuiltinMap, args: &Vec<String>) -> Option<i32> {
     if args.len() == 0 {
         return Some(0);
     }
 
     // Determine if command is builtin, and call function
-    if builtin_map.contains(&args[0]) {
-        return builtin_map
-            .get(&args[0])
-            .unwrap()
-            .borrow_mut()
-            .call(&args[1..]);
+    if let Some(result) = builtin_map.invoke(&args[0], &args[1..]) {
+        return result;
     }
 
     // Attempt to exec external process
     launch(&args)
 }
 
+/// Spawn a child process for external commands and wait for its exit status.
 fn launch(args: &Vec<String>) -> Option<i32> {
     let res = Command::new(&args[0]).args(&args[1..]).spawn();
 

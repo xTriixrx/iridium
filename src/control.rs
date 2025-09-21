@@ -1,3 +1,5 @@
+//! Runs the interactive command loop and hooks up the line editor.
+
 use std::io::{self, Write};
 use rustyline::error::ReadlineError;
 use crate::control_state::ControlFlow;
@@ -10,11 +12,12 @@ use crate::complete::history::load_history_entries;
 use rustyline::{hint::HistoryHinter, history::FileHistory};
 use rustyline::{Cmd, Editor, Event, EventHandler, KeyEvent, Result};
 
+/// Run the interactive shell loop, handling input, history, and control flow.
 pub fn control_loop() -> Result<()> {
     let mut stdout = io::stdout();
     let mut control_state = ControlState::new();
     let mut rl = Editor::<IridiumHelper, DefaultHistory>::new()?;
-    
+
     // Set the custom helper callback
     rl.set_helper(Some(IridiumHelper::new(HistoryHinter::new())));
 
@@ -53,26 +56,28 @@ pub fn control_loop() -> Result<()> {
     Ok(())
 }
 
+/// Attach custom completion and hint handlers to the readline editor.
 fn bind_handlers(rl: &mut Editor<IridiumHelper, FileHistory>) {
     let ceh = Box::new(CompleteHintHandler::new());
 
     //
     rl.bind_sequence(KeyEvent::ctrl('b'), EventHandler::Conditional(ceh.clone()));
-    
+
     //
     rl.bind_sequence(KeyEvent::alt('f'), EventHandler::Conditional(ceh));
-    
+
     //
     rl.bind_sequence(
         KeyEvent::from('\t'),
         EventHandler::Conditional(Box::new(TabEventHandler::new())));
-    
+
     //
     rl.bind_sequence(
         Event::KeySeq(vec![KeyEvent::ctrl('X'), KeyEvent::ctrl('E')]),
         EventHandler::Simple(Cmd::Suspend));
 }
 
+/// Load persisted history entries and replay them into the editor state.
 fn load_history(rl: &mut Editor<IridiumHelper, FileHistory>) {
     match load_history_entries(None) {
         Ok(history) => {

@@ -1,17 +1,20 @@
 use rustyline::{Cmd, ConditionalEventHandler, Event, EventContext, KeyEvent, RepeatCount};
 
+/// Conditional handler that accepts or inserts completion hints.
 #[derive(Clone)]
 pub struct CompleteHintHandler;
 
 impl CompleteHintHandler {
+    /// Construct the hint handler.
     pub fn new() -> Self {
         Self {
-
+            
         }
     }
 }
 
 impl ConditionalEventHandler for CompleteHintHandler {
+    /// Inject completion hints or accept them based on the pressed key.
     fn handle(&self, evt: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
         if !ctx.has_hint() {
             return None; // default

@@ -1,11 +1,7 @@
 pub mod map;
 
-// Would like to move this to the heap but keep static for commands
-// that need to reference built in commands..
-pub const BUILTIN_NAMES: [&str; 10] = [
-    "alias", "cd", "exit", "help", "history", "pushd", "pwd", "type", "welcome", "which",
-];
-
+/// Trait implemented by all builtins so they can be invoked through [`BuiltinMap`].
 pub trait Builtin {
+    /// Execute the builtin with the provided arguments, returning an optional status code.
     fn call(&mut self, args: &[String]) -> Option<i32>;
 }

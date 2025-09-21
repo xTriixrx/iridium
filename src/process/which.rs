@@ -1,16 +1,19 @@
-use crate::process::alias::Alias;
-use crate::process::builtin::BUILTIN_NAMES;
-use crate::process::builtin::Builtin;
-use std::cell::RefCell;
 use std::env;
-use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use crate::process::alias::Alias;
+use crate::process::builtin::Builtin;
 
+/// Implementation of the `which` builtin that searches aliases, builtins, and the PATH.
 pub struct Which {
     aliases: Option<Rc<RefCell<Alias>>>,
+    builtin_names: HashSet<String>,
 }
 
 impl Builtin for Which {
+    /// Resolve a command name to an alias, builtin, or filesystem path.
     fn call(&mut self, args: &[String]) -> Option<i32> {
         let aliases = match self.aliases.as_ref() {
             Some(aliases) => aliases.borrow(),
@@ -25,7 +28,7 @@ impl Builtin for Which {
         }
 
         // Check if command is a built in command
-        if BUILTIN_NAMES.contains(&args[0].as_str()) {
+        if self.builtin_names.contains(&args[0]) {
             println!("{}: shell built-in command", args[0]);
             return Some(0);
         }
@@ -63,11 +66,21 @@ impl Builtin for Which {
 }
 
 impl Which {
+    /// Construct a `which` builtin that can later be wired with dependencies.
     pub fn new() -> Self {
-        Which { aliases: None }
+        Self {
+            aliases: None,
+            builtin_names: HashSet::new(),
+        }
     }
 
+    /// Inject the alias table so `which` can inspect defined aliases.
     pub fn set_aliases(&mut self, aliases: Rc<RefCell<Alias>>) {
         self.aliases = Some(aliases);
+    }
+
+    /// Provide the set of builtin names so they can be reported to the user.
+    pub fn set_builtin_names(&mut self, names: impl IntoIterator<Item = String>) {
+        self.builtin_names = names.into_iter().collect();
     }
 }

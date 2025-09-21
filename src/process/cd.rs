@@ -15,15 +15,14 @@ use std::rc::Rc;
 /// # Synopsis
 /// cd [-L|-P] [directory]
 /// cd -
+///
+/// Implements the POSIX `cd` builtin and tracks the `pwd` dependency when provided.
 pub struct Cd {
     pwd: Option<Rc<RefCell<Pwd>>>,
 }
 
-///
-///
 impl Builtin for Cd {
-    ///
-    ///
+    /// Resolve command arguments and update process working directory state.
     fn call(&mut self, args: &[String]) -> Option<i32> {
         // Get HOME env variable
         let mut home = match env::var("HOME") {
@@ -62,23 +61,19 @@ impl Builtin for Cd {
     }
 }
 
-///
-///
 impl Cd {
+    /// Construct a new `cd` builtin with no pwd dependency wired yet.
     pub fn new() -> Self {
         Cd { pwd: None }
     }
 
+    /// Provide the shared `pwd` builtin so `cd` can print the previous directory.
     pub fn set_pwd(&mut self, pwd: Rc<RefCell<Pwd>>) {
         self.pwd = Some(pwd);
     }
 }
 
-///
-/// cases:
-/// cd test -> pwd path should be /Users/vnigro/Documents/iridium/test  (-P without test path)
-/// cd ../iridium/test -> pwd path should be /Users/vnigro/Documents/iridium/test (-P without test path)
-/// cd ~/.... -> pwd path should be replaced with HOME value
+/// Resolve the requested target directory and update environment state.
 fn set_dir(path: &mut String) -> Option<i32> {
     // Clone provided path before attempting to replace '~'
     let mut modpath = path.clone();
@@ -115,6 +110,7 @@ fn set_dir(path: &mut String) -> Option<i32> {
     update_path(new_path)
 }
 
+/// Apply the directory change and make sure `PWD` and `OLDPWD` mirror the change.
 fn update_path(new_path: PathBuf) -> Option<i32> {
     // Get current path before changing directories
     let cur_path = match env::current_dir() {

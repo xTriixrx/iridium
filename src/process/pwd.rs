@@ -39,6 +39,7 @@ use std::path::Path;
 pub struct Pwd {}
 
 impl Builtin for Pwd {
+    /// Print the current directory, resolving options according to POSIX `pwd` rules.
     fn call(&mut self, args: &[String]) -> Option<i32> {
         let mut options: Vec<&String> = Vec::new();
 
@@ -78,15 +79,18 @@ impl Builtin for Pwd {
 }
 
 impl Pwd {
+    /// Construct a new `pwd` builtin.
     pub fn new() -> Self {
         Pwd {}
     }
 
+    /// Return the `PWD` environment variable, canonicalised when necessary.
     pub fn get_pwd(&self) -> String {
         get_pwd()
     }
 }
 
+/// Read the `PWD` environment variable, defaulting to an empty string.
 fn get_pwd() -> String {
     match env::var("PWD") {
         Ok(pwd) => pwd,

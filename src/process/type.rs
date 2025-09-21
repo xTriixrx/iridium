@@ -14,16 +14,19 @@ use crate::process::builtin::Builtin;
 // -P Forces a PATH search for each name, even if 'type -t name' would not return file.
 //      If a command is hashed, -p and -P print the hashed value, not necessarily the file that appears first in PATH.
 // With no options, indicate how each name would be interpreted if used as a command name.
+/// Stub implementation of the `type` builtin.
 pub struct Type {}
 
 impl Builtin for Type {
-    fn call(&mut self, args: &[String]) -> Option<i32> {
+    /// Currently prints a placeholder message and exits successfully.
+    fn call(&mut self, _args: &[String]) -> Option<i32> {
         println!("TYPE!");
         Some(0)
     }
 }
 
 impl Type {
+    /// Construct a new type builtin instance.
     pub fn new() -> Self {
         Type {}
     }

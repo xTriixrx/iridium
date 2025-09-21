@@ -4,8 +4,10 @@ use std::io::{self, BufRead, BufReader};
 
 use crate::process::history::history_file_path;
 
+/// Default maximum number of history entries to load for hinting.
 const DEFAULT_HISTORY_LIMIT: usize = 1024;
 
+/// Load shell history lines from disk up to the requested limit.
 pub fn load_history_entries(limit: Option<usize>) -> io::Result<Vec<String>> {
     let path = history_file_path();
     let limit = limit.unwrap_or(DEFAULT_HISTORY_LIMIT);
@@ -32,6 +34,7 @@ pub fn load_history_entries(limit: Option<usize>) -> io::Result<Vec<String>> {
     Ok(entries.into_iter().collect())
 }
 
+/// Parse a persisted history line and extract the raw command if present.
 fn parse_history_command(line: &str) -> Option<String> {
     let mut parts = line.splitn(3, ':');
     let timestamp = parts.next()?;
