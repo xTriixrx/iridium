@@ -889,3 +889,194 @@ pub enum StateDelta {
 ---
 
 With these diagrams and Rust design sketches, the integrated scripting suite can be implemented as a cohesive, persistent, and extensible feature set inside the Iridium shell. The PlantUML blocks in this document can be rendered to image files, and the Rust snippets map directly to modules and traits you can flesh out during development.
+
+---
+
+## Appendix: Prototype Rust Structures
+
+The following sketches consolidate the initial Rust types outlined across the design. They serve as a quick reference for contributors starting an implementation.
+
+### Control State & Modes
+
+```rust
+pub struct ControlState {
+    mode: ShellMode,
+    buffers: BufferStore,
+    pipelines: PipelineStore,
+    macros: MacroStore,
+    persistence: PersistenceService,
+    executor: ExecutionBridge,
+}
+
+impl ControlState {
+    pub fn handle_line(&mut self, line: String) -> ControlFlow {
+        // dispatch based on mode, persist deltas, update execution state
+    }
+
+    pub fn switch_mode(&mut self, new_mode: ShellMode) {
+        self.mode = new_mode;
+        // optional persistence hook
+    }
+}
+
+pub enum ShellMode {
+    Prompt,
+    Buffer,
+    PipelineDef,
+    MacroDef,
+}
+```
+
+### Buffer Management
+
+```rust
+pub struct BufferStore {
+    items: HashMap<BufferId, Buffer>,
+}
+
+impl BufferStore {
+    pub fn create(&mut self, name: impl Into<String>) -> BufferId { /* ... */ }
+    pub fn list(&self) -> Vec<BufferSummary> { /* ... */ }
+    pub fn get_mut(&mut self, id: &BufferId) -> Option<&mut Buffer> { /* ... */ }
+}
+
+pub struct Buffer {
+    pub id: BufferId,
+    pub name: String,
+    pub body: Vec<String>,
+    pub metadata: BufferMetadata,
+}
+
+impl Buffer {
+    pub fn append(&mut self, line: String) { /* ... */ }
+    pub fn insert(&mut self, index: usize, line: String) { /* ... */ }
+    pub fn clear(&mut self) { /* ... */ }
+}
+```
+
+### Pipeline Registry
+
+```rust
+pub struct PipelineStore {
+    items: HashMap<PipelineId, Pipeline>,
+}
+
+impl PipelineStore {
+    pub fn define(&mut self, def: PipelineDefinition) -> Result<PipelineId> { /* ... */ }
+    pub fn update(&mut self, id: PipelineId, def: PipelineDefinition) -> Result<()> { /* ... */ }
+    pub fn resolve(&self, name: &str) -> Result<&Pipeline> { /* ... */ }
+}
+
+pub struct PipelineDefinition {
+    pub name: String,
+    pub signature: PipelineSignature,
+    pub body: String,
+    pub metadata: PipelineMetadata,
+    pub policies: Vec<Policy>,
+}
+
+pub struct Pipeline {
+    pub id: PipelineId,
+    pub name: String,
+    pub signature: PipelineSignature,
+    pub body: String,
+    pub policies: Vec<Policy>,
+    pub dependencies: Vec<MacroDependency>,
+    pub version: VersionId,
+}
+```
+
+### Macro Registry
+
+```rust
+pub struct MacroStore {
+    items: HashMap<MacroId, MacroDefinition>,
+}
+
+impl MacroStore {
+    pub fn define(&mut self, def: MacroDefinition) -> Result<MacroId> { /* ... */ }
+    pub fn resolve(&self, name: &str, version: Option<VersionId>) -> Result<&MacroDefinition> { /* ... */ }
+}
+
+pub struct MacroDefinition {
+    pub id: MacroId,
+    pub name: String,
+    pub signature: MacroSignature,
+    pub body: String,
+    pub policies: Vec<Policy>,
+    pub version_history: Vec<MacroVersion>,
+}
+
+pub struct MacroSignature {
+    pub params: Vec<MacroParam>,
+}
+```
+
+### Persistence Service
+
+```rust
+pub struct PersistenceService {
+    backend: Box<dyn StateBackend>,
+    cache: PersistentState,
+}
+
+impl PersistenceService {
+    pub fn load(&mut self) -> Result<()> { /* ... */ }
+    pub fn save(&mut self, delta: StateDelta) -> Result<()> { /* ... */ }
+    pub fn snapshot(&mut self) -> Result<()> { /* ... */ }
+    pub fn export(&self, path: &Path) -> Result<()> { /* ... */ }
+    pub fn import(&mut self, path: &Path) -> Result<()> { /* ... */ }
+}
+
+pub trait StateBackend {
+    fn load(&self) -> Result<PersistentState>;
+    fn save(&self, state: &PersistentState) -> Result<()>;
+    fn migrate(&self, state: PersistentState, to_version: u32) -> Result<PersistentState>;
+}
+```
+
+### Execution & Rendering
+
+```rust
+pub struct ExecutionBridge;
+
+impl ExecutionBridge {
+    pub fn execute(&self, script: ScriptPayload, options: ExecOptions) -> ExecResult {
+        // spawn process, stream output, return status and captures
+    }
+}
+
+pub struct TemplateResolver {
+    pipeline_store: PipelineStore,
+    macro_store: MacroStore,
+    policy_engine: PolicyEngine,
+}
+
+impl TemplateResolver {
+    pub fn render(&self, pipeline: &Pipeline, args: &ArgBindings) -> Result<ScriptPayload> { /* ... */ }
+    fn expand_macro(&self, call: MacroCall, ctx: &mut RenderContext) -> Result<String> { /* ... */ }
+}
+```
+
+### Pipeline–Buffer Traceability Types
+
+```rust
+pub struct PipelineBufferLink {
+    pub pipeline_id: PipelineId,
+    pub buffer_id: Option<BufferId>,
+    pub buffer_snapshot: Option<BufferSnapshot>,
+    pub last_saved_version: VersionId,
+    pub last_active_at: DateTime<Utc>,
+    pub labels: Vec<String>,
+}
+
+pub struct BufferSnapshot {
+    pub body: Vec<String>,
+    pub metadata: BufferMetadata,
+    pub persisted_at: DateTime<Utc>,
+}
+
+pub struct PipelineTraceIndex {
+    pub links: HashMap<PipelineId, PipelineBufferLink>,
+}
+```
