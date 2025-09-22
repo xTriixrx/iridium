@@ -1,10 +1,10 @@
+use crate::process::builtin::Builtin;
+use rev_lines::RevLines;
 use std::env;
 use std::fs::File;
-use std::io::Write;
-use rev_lines::RevLines;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use crate::process::builtin::Builtin;
 
 #[cfg(windows)]
 /// Platform-specific newline used when persisting history entries.

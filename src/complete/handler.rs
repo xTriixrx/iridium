@@ -6,9 +6,7 @@ pub struct TabEventHandler;
 impl TabEventHandler {
     /// Construct the tab event handler.
     pub fn new() -> Self {
-        Self {
-            
-        }
+        Self {}
     }
 }
 

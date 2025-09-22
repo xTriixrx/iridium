@@ -1,16 +1,16 @@
 //! Runs the interactive command loop and hooks up the line editor.
 
-use std::io::{self, Write};
-use rustyline::error::ReadlineError;
-use crate::control_state::ControlFlow;
-use crate::control_state::ControlState;
-use rustyline::history::DefaultHistory;
-use crate::complete::helper::IridiumHelper;
 use crate::complete::handler::TabEventHandler;
+use crate::complete::helper::IridiumHelper;
 use crate::complete::hinter::CompleteHintHandler;
 use crate::complete::history::load_history_entries;
-use rustyline::{hint::HistoryHinter, history::FileHistory};
+use crate::control_state::ControlFlow;
+use crate::control_state::ControlState;
+use rustyline::error::ReadlineError;
+use rustyline::history::DefaultHistory;
 use rustyline::{Cmd, Editor, Event, EventHandler, KeyEvent, Result};
+use rustyline::{hint::HistoryHinter, history::FileHistory};
+use std::io::{self, Write};
 
 /// Run the interactive shell loop, handling input, history, and control flow.
 pub fn control_loop() -> Result<()> {
@@ -69,12 +69,14 @@ fn bind_handlers(rl: &mut Editor<IridiumHelper, FileHistory>) {
     //
     rl.bind_sequence(
         KeyEvent::from('\t'),
-        EventHandler::Conditional(Box::new(TabEventHandler::new())));
+        EventHandler::Conditional(Box::new(TabEventHandler::new())),
+    );
 
     //
     rl.bind_sequence(
         Event::KeySeq(vec![KeyEvent::ctrl('X'), KeyEvent::ctrl('E')]),
-        EventHandler::Simple(Cmd::Suspend));
+        EventHandler::Simple(Cmd::Suspend),
+    );
 }
 
 /// Load persisted history entries and replay them into the editor state.

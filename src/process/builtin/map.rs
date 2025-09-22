@@ -1,18 +1,18 @@
-use std::rc::Rc;
-use std::any::Any;
 use super::Builtin;
-use std::cell::RefCell;
+use crate::process::alias::Alias;
 use crate::process::cd::Cd;
-use crate::process::pwd::Pwd;
-use std::collections::HashMap;
 use crate::process::exit::Exit;
 use crate::process::help::Help;
-use crate::process::alias::Alias;
-use crate::process::pushd::Pushd;
-use crate::process::r#type::Type;
-use crate::process::which::Which;
 use crate::process::history::History;
+use crate::process::pushd::Pushd;
+use crate::process::pwd::Pwd;
+use crate::process::r#type::Type;
 use crate::process::welcome::Welcome;
+use crate::process::which::Which;
+use std::any::Any;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Shared interface that lets [`BuiltinMap`] invoke builtins without knowing their concrete types.
 trait BuiltinAdapter: Any {

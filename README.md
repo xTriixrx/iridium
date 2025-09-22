@@ -19,6 +19,8 @@
                                         ░                              
 ```
 
+ASCII art was generated from https://patorjk.com/software/taag/ using the 'Bloody' ASCI Font.
+
 ## What is Iridium?
 
 ### Iridium Goals

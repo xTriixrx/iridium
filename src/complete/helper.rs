@@ -1,7 +1,7 @@
-use rustyline::hint::HistoryHinter;
 use rustyline::highlight::Highlighter;
-use std::borrow::Cow::{self, Borrowed, Owned};
+use rustyline::hint::HistoryHinter;
 use rustyline_derive::{Completer, Helper, Hinter, Validator};
+use std::borrow::Cow::{self, Borrowed, Owned};
 
 /// Aggregates the rustyline helper traits used by Iridium.
 #[derive(Completer, Helper, Hinter, Validator)]

@@ -1,10 +1,10 @@
-use std::env;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
 use crate::process::alias::Alias;
 use crate::process::builtin::Builtin;
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::env;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// Implementation of the `which` builtin that searches aliases, builtins, and the PATH.
 pub struct Which {

@@ -7,9 +7,7 @@ pub struct CompleteHintHandler;
 impl CompleteHintHandler {
     /// Construct the hint handler.
     pub fn new() -> Self {
-        Self {
-            
-        }
+        Self {}
     }
 }
 
