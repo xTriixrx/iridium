@@ -8,24 +8,22 @@ mod store;
 
 use rustyline::Result;
 
-use std::io::{self, Read};
-use crossterm::terminal::enable_raw_mode;
 use crossterm::terminal::disable_raw_mode;
+use crossterm::terminal::enable_raw_mode;
+use std::io::{self, Read};
 
 use crate::editor::buffer_editor::BufferEditor;
 
 /// Entry point that prints the welcome banner and starts the control loop.
 fn main() -> Result<()> {
+    // let mut editor = BufferEditor::new("test");
+    // editor.run();
+    // Ok(())
 
+    let empty_slice: [String; 0] = [];
 
-    let mut editor = BufferEditor::new("test");
-    editor.run();
-    Ok(())
-
-    // let empty_slice: [String; 0] = [];
-
-    // // Perform welcome message
+    // Perform welcome message
     // process::welcome::welcome(&empty_slice);
 
-    // control::control_loop()
+    control::control_loop()
 }

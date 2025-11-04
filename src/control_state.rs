@@ -2,9 +2,12 @@
 
 use shlex;
 use std::env;
+use std::mem;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::editor::buffer_editor::{BufferEditor, EditorAction, EditorMode};
+use crate::editor::buffer_editor::BufferEditor;
+use crate::editor::terminal::Terminal;
 use crate::process;
 use crate::process::builtin::map::BuiltinMap;
 use crate::store::buffer::BufferStore;
@@ -23,24 +26,26 @@ pub struct ControlState {
     status: Option<i32>,
     builtin_map: BuiltinMap,
     mode: ShellMode,
-    buffers: BufferStore,
+    buffers: Arc<Mutex<BufferStore>>,
 }
 
 #[derive(Debug, Clone)]
 enum ShellMode {
     Prompt,
-    Buffer(BufferEditor),
+    Buffer(String),
 }
 
 impl ControlState {
     /// Build a new control state with the default builtin set.
     pub fn new() -> Self {
         let builtin_map = BuiltinMap::new();
+        let buffers = Arc::new(Mutex::new(BufferStore::new()));
+        Terminal::instance().attach_store(Arc::clone(&buffers));
         Self {
             status: Some(0),
             builtin_map,
             mode: ShellMode::Prompt,
-            buffers: BufferStore::new(),
+            buffers,
         }
     }
 
@@ -48,18 +53,20 @@ impl ControlState {
     pub fn prompt(&self) -> String {
         match &self.mode {
             ShellMode::Prompt => generate_prompt(self.status, &self.builtin_map.get_pwd()),
-            ShellMode::Buffer(editor) => editor.prompt(),
+            ShellMode::Buffer(_) => {
+                let editor = BufferEditor::instance();
+                let editor = editor.lock().expect("buffer editor lock poisoned");
+                editor.prompt_string()
+            }
         }
     }
 
     /// Parse and execute a single line of user input, updating status and history.
     pub fn handle_line(&mut self, line: &str) -> ControlFlow {
-        match &mut self.mode {
+        match self.mode {
             ShellMode::Prompt => self.handle_prompt_line(line),
-            ShellMode::Buffer(editor) => {
-                let buffer_name = editor.name().to_string();
-                let action = editor.handle_input(line);
-                self.apply_editor_action(buffer_name, action);
+            ShellMode::Buffer(_) => {
+                self.run_buffer_session();
                 ControlFlow::CONTINUE
             }
         }
@@ -97,10 +104,11 @@ impl ControlState {
 
     fn handle_prompt_command(&mut self, command: &str) -> ControlFlow {
         if command == ":buffers" {
-            if self.buffers.is_empty() {
+            let store = self.buffers.lock().expect("buffer store lock poisoned");
+            if store.is_empty() {
                 println!("(no buffers)");
             } else {
-                for name in self.buffers.list() {
+                for name in store.list() {
                     println!("- {name}");
                 }
             }
@@ -115,9 +123,15 @@ impl ControlState {
             }
 
             let buffer_name = name.to_string();
-            self.buffers.open(buffer_name.clone());
-            self.mode = ShellMode::Buffer(BufferEditor::new(buffer_name.clone()));
-            println!("Opened buffer '{buffer_name}'. Enter 'i' to insert text and ':q' to close.");
+            self.buffers
+                .lock()
+                .expect("buffer store lock poisoned")
+                .open(buffer_name.clone());
+            self.mode = ShellMode::Buffer(buffer_name.clone());
+            println!(
+                "Opened buffer '{buffer_name}'. Press ':i' to enter insert mode and Ctrl+C to exit the editor."
+            );
+            self.run_buffer_session();
             return ControlFlow::CONTINUE;
         }
 
@@ -125,57 +139,12 @@ impl ControlState {
         ControlFlow::CONTINUE
     }
 
-    fn apply_editor_action(&mut self, buffer_name: String, action: EditorAction) {
-        match action {
-            EditorAction::Append(line) => {
-                let buffer = self.buffers.open(buffer_name.clone());
-                buffer.append(line);
-            }
-            EditorAction::Clear => {
-                if let Some(buffer) = self.buffers.get_mut(&buffer_name) {
-                    buffer.clear();
-                }
-                println!("Cleared buffer '{buffer_name}'.");
-            }
-            EditorAction::DeleteLast => {
-                if let Some(buffer) = self.buffers.get_mut(&buffer_name) {
-                    match buffer.remove_last() {
-                        Some(_) => println!("Deleted last line."),
-                        None => println!("Buffer '{buffer_name}' is empty."),
-                    }
-                }
-            }
-            EditorAction::Show => {
-                if let Some(buffer) = self.buffers.get(&buffer_name) {
-                    buffer.print();
-                }
-            }
-            EditorAction::ListBuffers => {
-                if self.buffers.is_empty() {
-                    println!("(no buffers)");
-                } else {
-                    for name in self.buffers.list() {
-                        println!("- {name}");
-                    }
-                }
-            }
-            EditorAction::Quit { write } => {
-                if write {
-                    if let Some(buffer) = self.buffers.get(&buffer_name) {
-                        buffer.print();
-                    }
-                }
-                println!("Leaving buffer '{buffer_name}'.");
-                self.mode = ShellMode::Prompt;
-            }
-            EditorAction::SwitchMode(mode) => match mode {
-                EditorMode::Insert => println!("-- INSERT --"),
-                EditorMode::Command => println!("-- COMMAND --"),
-            },
-            EditorAction::UnknownCommand(cmd) => {
-                println!("Unknown buffer command '{cmd}'. Use ':w', ':q', ':clear', 'i'.");
-            }
-            EditorAction::NoOp => {}
+    fn run_buffer_session(&mut self) {
+        if let ShellMode::Buffer(buffer_name) = mem::replace(&mut self.mode, ShellMode::Prompt) {
+            let editor = BufferEditor::instance();
+            let mut editor = editor.lock().expect("buffer editor lock poisoned");
+            editor.open(buffer_name);
+            editor.run();
         }
     }
 }

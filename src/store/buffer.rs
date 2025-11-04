@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
 pub struct BufferStore {
@@ -33,6 +36,43 @@ impl BufferStore {
 
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
+    }
+
+    pub fn insert_char(&mut self, name: &str, row: usize, col: usize, ch: char) {
+        let buffer = self
+            .items
+            .entry(name.to_string())
+            .or_insert_with(|| Buffer::new(name.to_string()));
+        buffer.insert_char(row, col, ch);
+    }
+
+    pub fn save_all(&self) -> io::Result<()> {
+        for buffer in self.items.values() {
+            buffer.save_to_disk()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn delete_char(&mut self, name: &str, row: usize, col: usize) -> Option<(usize, usize)> {
+        let buffer = self.items.get_mut(name)?;
+        buffer.delete_char(row, col)
+    }
+
+    pub fn insert_newline(&mut self, name: &str, row: usize, col: usize) -> (usize, usize) {
+        let buffer = self
+            .items
+            .entry(name.to_string())
+            .or_insert_with(|| Buffer::new(name.to_string()));
+        buffer.insert_newline(row, col)
+    }
+
+    pub fn pad_line(&mut self, name: &str, row: usize, width: usize) {
+        let buffer = self
+            .items
+            .entry(name.to_string())
+            .or_insert_with(|| Buffer::new(name.to_string()));
+        buffer.pad_line(row, width);
     }
 }
 
@@ -70,5 +110,107 @@ impl Buffer {
                 println!("{line}");
             }
         }
+    }
+
+    pub fn insert_char(&mut self, row: usize, col: usize, ch: char) {
+        while self.lines.len() <= row {
+            self.lines.push(String::new());
+        }
+
+        if let Some(line) = self.lines.get_mut(row) {
+            let char_count = line.chars().count();
+            if col > char_count {
+                line.push_str(&" ".repeat(col - char_count));
+            }
+
+            if col >= char_count {
+                line.push(ch);
+            } else {
+                let start = Self::byte_index(line, col);
+                let end = Self::byte_index(line, col + 1);
+                line.replace_range(start..end, &ch.to_string());
+            }
+        }
+    }
+
+    pub fn lines(&self) -> &[String] {
+        &self.lines
+    }
+
+    fn save_to_disk(&self) -> io::Result<()> {
+        let path = Path::new(&self.name);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+
+        let mut file = File::create(path)?;
+        for line in &self.lines {
+            writeln!(file, "{}", line)?;
+        }
+
+        Ok(())
+    }
+
+    fn delete_char(&mut self, row: usize, col: usize) -> Option<(usize, usize)> {
+        let line = self.lines.get_mut(row)?;
+        let char_count = line.chars().count();
+        if col == 0 || col > char_count {
+            return None;
+        }
+
+        let start = Self::byte_index(line, col - 1);
+        let end = Self::byte_index(line, col);
+        line.replace_range(start..end, "");
+        Some((row, col - 1))
+    }
+
+    fn insert_newline(&mut self, row: usize, col: usize) -> (usize, usize) {
+        while self.lines.len() <= row {
+            self.lines.push(String::new());
+        }
+
+        let trailing = if let Some(line) = self.lines.get_mut(row) {
+            let char_count = line.chars().count();
+            if col > char_count {
+                line.push_str(&" ".repeat(col - char_count));
+            }
+            let idx = Self::byte_index(line, col);
+            line.split_off(idx)
+        } else {
+            String::new()
+        };
+
+        self.lines.insert(row + 1, trailing);
+        (row + 1, 0)
+    }
+
+    fn pad_line(&mut self, row: usize, width: usize) {
+        while self.lines.len() <= row {
+            self.lines.push(String::new());
+        }
+
+        if let Some(line) = self.lines.get_mut(row) {
+            let char_count = line.chars().count();
+            if char_count < width {
+                line.push_str(&" ".repeat(width - char_count));
+            }
+        }
+    }
+
+    fn byte_index(line: &str, char_idx: usize) -> usize {
+        if char_idx == 0 {
+            return 0;
+        }
+
+        let mut count = 0;
+        for (idx, _) in line.char_indices() {
+            if count == char_idx {
+                return idx;
+            }
+            count += 1;
+        }
+        line.len()
     }
 }
