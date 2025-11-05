@@ -28,6 +28,8 @@ pub struct ControlState {
     builtin_map: BuiltinMap,
     mode: ShellMode,
     buffers: Arc<Mutex<BufferStore>>,
+    #[cfg(test)]
+    opened_buffers: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +49,8 @@ impl ControlState {
             builtin_map,
             mode: ShellMode::Prompt,
             buffers,
+            #[cfg(test)]
+            opened_buffers: Vec::new(),
         }
     }
 
@@ -71,6 +75,48 @@ impl ControlState {
                 ControlFlow::CONTINUE
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    fn make_state() -> ControlState {
+        ControlState {
+            status: Some(0),
+            builtin_map: BuiltinMap::new(),
+            mode: ShellMode::Prompt,
+            buffers: Arc::new(Mutex::new(BufferStore::new())),
+            opened_buffers: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn opens_multiple_buffers_in_sequence() {
+        let mut state = make_state();
+        let flow = state.handle_buffer_commands(":b first second");
+
+        assert_eq!(flow, ControlFlow::CONTINUE);
+        assert_eq!(
+            state.opened_buffers,
+            vec!["first".to_string(), "second".to_string()]
+        );
+
+        let store = state.buffers.lock().expect("buffer store lock poisoned");
+        let mut names = store.list();
+        names.sort();
+        assert_eq!(names, vec!["first".to_string(), "second".to_string()]);
+    }
+
+    #[test]
+    fn opens_single_buffer() {
+        let mut state = make_state();
+        let flow = state.handle_buffer_commands(":b only");
+
+        assert_eq!(flow, ControlFlow::CONTINUE);
+        assert_eq!(state.opened_buffers, vec!["only".to_string()]);
     }
 }
 
@@ -123,12 +169,20 @@ impl ControlState {
         ControlFlow::CONTINUE
     }
 
+    #[cfg(not(test))]
     fn run_buffer_session(&mut self) {
         if let ShellMode::Buffer(buffer_name) = mem::replace(&mut self.mode, ShellMode::Prompt) {
             let editor = BufferEditor::instance();
             let mut editor = editor.lock().expect("buffer editor lock poisoned");
             editor.open(buffer_name);
             editor.run();
+        }
+    }
+
+    #[cfg(test)]
+    fn run_buffer_session(&mut self) {
+        if let ShellMode::Buffer(buffer_name) = mem::replace(&mut self.mode, ShellMode::Prompt) {
+            self.opened_buffers.push(buffer_name);
         }
     }
 
@@ -155,19 +209,21 @@ impl ControlState {
             return ControlFlow::CONTINUE;
         }
 
-        let buffer_name = args.last().cloned().expect("expected buffer argument");
+        let buffer_names: Vec<String> = args.to_vec();
 
-        for name in args {
+        for name in &buffer_names {
             store.open(name.clone());
         }
 
         drop(store);
 
-        self.mode = ShellMode::Buffer(buffer_name.clone());
-        println!(
-            "Opened buffer '{buffer_name}'. Press ':i' to enter insert mode and Ctrl+C to exit the editor."
-        );
-        self.run_buffer_session();
+        for buffer_name in &buffer_names {
+            self.mode = ShellMode::Buffer(buffer_name.clone());
+            println!(
+                "Opened buffer '{buffer_name}'. Press ':i' to enter insert mode and Ctrl+C to exit the editor."
+            );
+            self.run_buffer_session();
+        }
 
         if !post_session_options.is_empty() {
             let mut store = self.buffers.lock().expect("buffer store lock poisoned");

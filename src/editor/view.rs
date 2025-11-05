@@ -52,9 +52,11 @@ impl View {
 
     pub fn render(
         view: &BufferView,
+        buffer_name: &str,
         mode: &EditorMode,
         command_input: &str,
         scroll_offset: usize,
+        cursor_position: (usize, usize),
     ) -> Result<(), Error> {
         let Size { width, height } = Terminal::size()?;
         let command_row = height.saturating_sub(1);
@@ -79,21 +81,106 @@ impl View {
 
             Terminal::print("\r\n")?;
         }
-
         Terminal::clear_line()?;
-        let mode_text = ";";
-        let display_command = if command_input.is_empty() {
-            ":"
-        } else {
-            command_input
-        };
-        let command_text: String = if width > 0 {
-            display_command.chars().take(width).collect()
-        } else {
-            String::new()
-        };
-        Terminal::print(&command_text)?;
+        let command_line =
+            build_command_line(width, command_input, buffer_name, mode, cursor_position);
+        Terminal::print(&command_line)?;
 
         Ok(())
+    }
+}
+
+fn build_command_line(
+    width: usize,
+    command_input: &str,
+    buffer_name: &str,
+    mode: &EditorMode,
+    cursor_position: (usize, usize),
+) -> String {
+    if width == 0 {
+        return String::new();
+    }
+
+    let mut line: Vec<char> = vec![' '; width];
+
+    let display_command = if command_input.is_empty() {
+        ":"
+    } else {
+        command_input
+    };
+
+    for (idx, ch) in display_command.chars().take(width).enumerate() {
+        line[idx] = ch;
+    }
+
+    let mode_label = format!("[{}]", mode_name(mode));
+    let mode_chars: Vec<char> = mode_label.chars().collect();
+    if mode_chars.len() <= width {
+        let start = width - mode_chars.len();
+        for (offset, ch) in mode_chars.iter().enumerate() {
+            let idx = start + offset;
+            line[idx] = *ch;
+        }
+    }
+
+    let (row, col) = cursor_position;
+    let cursor_label = format!("{},{}", row, col);
+    let name_and_cursor = format!("{} {}", buffer_name, cursor_label);
+    let combo_chars: Vec<char> = name_and_cursor.chars().collect();
+    if !combo_chars.is_empty() && combo_chars.len() <= width {
+        let start = width.saturating_sub(combo_chars.len()) / 2;
+        for (offset, ch) in combo_chars.iter().enumerate() {
+            let idx = start + offset;
+            if idx < width && line[idx].is_ascii_whitespace() {
+                line[idx] = *ch;
+            }
+        }
+    }
+
+    line.iter().collect()
+}
+
+fn mode_name(mode: &EditorMode) -> &'static str {
+    match mode {
+        EditorMode::Insert => "INSERT",
+        EditorMode::Read => "READ",
+        EditorMode::Command => "COMMAND",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_line_includes_buffer_name_cursor_and_mode() {
+        let line = build_command_line(40, "", "test.rs", &EditorMode::Insert, (3, 5));
+
+        assert!(line.starts_with(":"));
+        assert!(line.ends_with("[INSERT]"));
+
+        let combo_index = line.find("test.rs 3,5").expect("buffer info missing");
+        let combo_center = combo_index + "test.rs 3,5".len() / 2;
+        let center = 40 / 2;
+        assert!((combo_center as isize - center as isize).abs() <= 2);
+    }
+
+    #[test]
+    fn command_line_respects_command_input_and_mode() {
+        let line = build_command_line(40, ":w", "buffer", &EditorMode::Read, (1, 1));
+
+        assert!(line.starts_with(":w"));
+        assert!(line.ends_with("[READ]"));
+        assert!(line.contains("buffer 1,1"));
+    }
+
+    #[test]
+    fn cursor_position_changes_are_reflected() {
+        let first = build_command_line(30, ":", "file", &EditorMode::Command, (2, 4));
+        let second = build_command_line(30, ":", "file", &EditorMode::Command, (5, 10));
+
+        assert!(first.contains("file 2,4"));
+        assert!(second.contains("file 5,10"));
+        assert_ne!(first, second);
     }
 }

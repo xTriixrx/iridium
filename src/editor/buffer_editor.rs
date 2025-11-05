@@ -199,6 +199,7 @@ impl BufferEditor {
 
     fn apply_input_action(&mut self, action: InputAction) -> Result<(), Error> {
         let mut redraw = false;
+        let mut keep_command_text = false;
 
         match action {
             InputAction::Quit => {
@@ -299,9 +300,30 @@ impl BufferEditor {
                     self.enter_insert_mode();
                 } else if command == "r" {
                     self.enter_read_mode();
+                } else if command == "w" {
+                    self.save_current_buffer()?;
+                    self.command_input = format!("\"{}\" written", self.name);
+                    keep_command_text = true;
+                } else if command == "wq" {
+                    self.save_current_buffer()?;
+                    self.command_input = format!("\"{}\" written", self.name);
+                    keep_command_text = true;
+                    self.quit = true;
+                } else if command == "x" {
+                    let was_dirty = self.buffer_is_dirty();
+                    if was_dirty {
+                        self.save_current_buffer()?;
+                        self.command_input = format!("\"{}\" written", self.name);
+                    } else {
+                        self.command_input = "No write since last change".to_string();
+                    }
+                    keep_command_text = true;
+                    self.quit = true;
                 }
 
-                self.command_input.clear();
+                if !keep_command_text {
+                    self.command_input.clear();
+                }
                 self.ensure_cursor_visible()?;
                 redraw = true;
             }
@@ -325,9 +347,14 @@ impl BufferEditor {
             let buffer_view = View::snapshot(&self.name);
             View::render(
                 &buffer_view,
+                &self.name,
                 &self.mode,
                 &self.command_input,
                 self.scroll_offset,
+                (
+                    self.location.y.saturating_add(1),
+                    self.location.x.saturating_add(1),
+                ),
             )?;
             let Size { width, height } = Terminal::size()?;
             let cursor_position = if !self.command_input.is_empty() {
@@ -425,5 +452,18 @@ impl BufferEditor {
             EditorMode::Insert => format!("[buffer:{}] -- INSERT -- ", self.name),
             EditorMode::Command => format!("[buffer:{}] ", self.name),
         }
+    }
+
+    fn buffer_is_dirty(&self) -> bool {
+        let store_handle = self.term.store_handle();
+        let store = store_handle.lock().expect("buffer store lock poisoned");
+        store.is_dirty(self.name.as_str())
+    }
+
+    fn save_current_buffer(&self) -> Result<(), Error> {
+        let store_handle = self.term.store_handle();
+        let mut store = store_handle.lock().expect("buffer store lock poisoned");
+        store.save(self.name.as_str())?;
+        Ok(())
     }
 }

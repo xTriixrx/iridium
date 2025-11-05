@@ -46,12 +46,40 @@ impl BufferStore {
         buffer.insert_char(row, col, ch);
     }
 
-    pub fn save_all(&self) -> io::Result<()> {
-        for buffer in self.items.values() {
-            buffer.save_to_disk()?;
+    pub fn save_all(&mut self) -> io::Result<()> {
+        for buffer in self.items.values_mut() {
+            if buffer.is_dirty() {
+                buffer.save_to_disk()?;
+            }
         }
 
         Ok(())
+    }
+
+    pub fn save(&mut self, name: &str) -> io::Result<()> {
+        if let Some(buffer) = self.items.get_mut(name) {
+            buffer.save_to_disk()
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn save_if_dirty(&mut self, name: &str) -> io::Result<bool> {
+        if let Some(buffer) = self.items.get_mut(name) {
+            if buffer.is_dirty() {
+                buffer.save_to_disk()?;
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    pub fn is_dirty(&self, name: &str) -> bool {
+        self.items
+            .get(name)
+            .map(|buffer| buffer.is_dirty())
+            .unwrap_or(false)
     }
 
     pub fn delete_char(&mut self, name: &str, row: usize, col: usize) -> Option<(usize, usize)> {
@@ -80,6 +108,7 @@ impl BufferStore {
 pub struct Buffer {
     name: String,
     lines: Vec<String>,
+    dirty: bool,
 }
 
 impl Buffer {
@@ -87,19 +116,26 @@ impl Buffer {
         Self {
             name,
             lines: Vec::new(),
+            dirty: false,
         }
     }
 
     pub fn append(&mut self, line: String) {
         self.lines.push(line);
+        self.dirty = true;
     }
 
     pub fn clear(&mut self) {
         self.lines.clear();
+        self.dirty = true;
     }
 
     pub fn remove_last(&mut self) -> Option<String> {
-        self.lines.pop()
+        let popped = self.lines.pop();
+        if popped.is_some() {
+            self.dirty = true;
+        }
+        popped
     }
 
     pub fn print(&self) {
@@ -130,6 +166,7 @@ impl Buffer {
                 let end = Self::byte_index(line, col + 1);
                 line.replace_range(start..end, &ch.to_string());
             }
+            self.dirty = true;
         }
     }
 
@@ -137,7 +174,7 @@ impl Buffer {
         &self.lines
     }
 
-    fn save_to_disk(&self) -> io::Result<()> {
+    fn save_to_disk(&mut self) -> io::Result<()> {
         let path = Path::new(&self.name);
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
@@ -150,6 +187,7 @@ impl Buffer {
             writeln!(file, "{}", line)?;
         }
 
+        self.dirty = false;
         Ok(())
     }
 
@@ -163,6 +201,7 @@ impl Buffer {
         let start = Self::byte_index(line, col - 1);
         let end = Self::byte_index(line, col);
         line.replace_range(start..end, "");
+        self.dirty = true;
         Some((row, col - 1))
     }
 
@@ -183,6 +222,7 @@ impl Buffer {
         };
 
         self.lines.insert(row + 1, trailing);
+        self.dirty = true;
         (row + 1, 0)
     }
 
@@ -195,8 +235,13 @@ impl Buffer {
             let char_count = line.chars().count();
             if char_count < width {
                 line.push_str(&" ".repeat(width - char_count));
+                self.dirty = true;
             }
         }
+    }
+
+    fn is_dirty(&self) -> bool {
+        self.dirty
     }
 
     fn byte_index(line: &str, char_idx: usize) -> usize {
@@ -212,5 +257,94 @@ impl Buffer {
             count += 1;
         }
         line.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BufferStore;
+    use std::fs;
+    use std::io::Read;
+
+    fn unique_temp_file() -> std::path::PathBuf {
+        let mut path = std::env::temp_dir();
+        let unique = format!(
+            "iridium_buffer_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        path.push(unique);
+        path
+    }
+
+    #[test]
+    fn save_persists_buffer_contents() {
+        let path = unique_temp_file();
+        let path_str = path.to_string_lossy().to_string();
+
+        let mut store = BufferStore::new();
+        let buffer = store.open(path_str.clone());
+        buffer.append("first line".into());
+        buffer.append("second line".into());
+
+        store.save(&path_str).expect("save should succeed");
+
+        assert!(!store.is_dirty(&path_str));
+
+        let mut file = fs::File::open(&path).expect("file should exist");
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .expect("should read file");
+
+        assert_eq!(contents, "first line\nsecond line\n");
+
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn save_if_dirty_only_writes_when_modified() {
+        let path = unique_temp_file();
+        let path_str = path.to_string_lossy().to_string();
+
+        let mut store = BufferStore::new();
+        let buffer = store.open(path_str.clone());
+        buffer.append("line".into());
+
+        assert!(
+            store
+                .save_if_dirty(&path_str)
+                .expect("save_if_dirty should succeed")
+        );
+        assert!(!store.is_dirty(&path_str));
+
+        // Second call should be a no-op and report false.
+        assert!(
+            !store
+                .save_if_dirty(&path_str)
+                .expect("save_if_dirty should succeed")
+        );
+
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn save_all_does_not_create_files_for_clean_buffers() {
+        let path = unique_temp_file();
+        let path_str = path.to_string_lossy().to_string();
+
+        let mut store = BufferStore::new();
+        store.open(path_str.clone());
+
+        store
+            .save_all()
+            .expect("save_all should succeed for clean buffers");
+
+        assert!(
+            !path.exists(),
+            "save_all should not create files for clean buffers"
+        );
     }
 }

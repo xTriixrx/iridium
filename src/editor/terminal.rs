@@ -58,7 +58,7 @@ impl Terminal {
 
     fn save_buffers(&self) -> Result<(), Error> {
         let store = self.store_handle();
-        let store = store.lock().expect("buffer store lock poisoned");
+        let mut store = store.lock().expect("buffer store lock poisoned");
         store.save_all()?;
         Ok(())
     }
