@@ -1,3 +1,4 @@
+mod cmd;
 mod complete;
 mod config;
 mod control;

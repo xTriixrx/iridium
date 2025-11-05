@@ -1,5 +1,6 @@
 //! State machine backing the interactive control loop.
 
+use crate::cmd::bufcmd;
 use shlex;
 use std::env;
 use std::mem;
@@ -103,36 +104,19 @@ impl ControlState {
     }
 
     fn handle_prompt_command(&mut self, command: &str) -> ControlFlow {
-        if command == ":buffers" {
-            let store = self.buffers.lock().expect("buffer store lock poisoned");
-            if store.is_empty() {
-                println!("(no buffers)");
-            } else {
-                for name in store.list() {
-                    println!("- {name}");
-                }
-            }
-            return ControlFlow::CONTINUE;
+        // All buffer commands start with :b
+        if command.contains(":b") {
+            return self.handle_buffer_commands(&command);
         }
 
-        if let Some(rest) = command.strip_prefix(":buffer") {
-            let name = rest.trim();
-            if name.is_empty() {
-                println!(":buffer requires a name");
-                return ControlFlow::CONTINUE;
-            }
+        // All macros commands start with :m
+        if command.contains(":m") {
+            return self.handle_macro_commands(&command);
+        }
 
-            let buffer_name = name.to_string();
-            self.buffers
-                .lock()
-                .expect("buffer store lock poisoned")
-                .open(buffer_name.clone());
-            self.mode = ShellMode::Buffer(buffer_name.clone());
-            println!(
-                "Opened buffer '{buffer_name}'. Press ':i' to enter insert mode and Ctrl+C to exit the editor."
-            );
-            self.run_buffer_session();
-            return ControlFlow::CONTINUE;
+        // All pipeline commands start with :p
+        if command.contains(":p") {
+            return self.handle_pipeline_commands(&command);
         }
 
         println!("Unknown command: {command}");
@@ -145,6 +129,92 @@ impl ControlState {
             let mut editor = editor.lock().expect("buffer editor lock poisoned");
             editor.open(buffer_name);
             editor.run();
+        }
+    }
+
+    // :b [options] <values>
+    fn handle_buffer_commands(&mut self, bufcmd: &str) -> ControlFlow {
+        let Some(command) = bufcmd::parse(bufcmd) else {
+            println!("Unknown buffer command: {bufcmd}");
+            return ControlFlow::CONTINUE;
+        };
+
+        let mut store = self.buffers.lock().expect("buffer store lock poisoned");
+
+        self.apply_pre_session_options(&mut store, command.pre_session_options());
+
+        let args = command.args();
+        let post_session_options = command.post_session_options();
+
+        if args.is_empty() {
+            if post_session_options.is_empty() {
+                println!(":buffer requires a name");
+            } else {
+                self.apply_post_session_options(&mut store, post_session_options, args);
+            }
+            return ControlFlow::CONTINUE;
+        }
+
+        let buffer_name = args.last().cloned().expect("expected buffer argument");
+
+        for name in args {
+            store.open(name.clone());
+        }
+
+        drop(store);
+
+        self.mode = ShellMode::Buffer(buffer_name.clone());
+        println!(
+            "Opened buffer '{buffer_name}'. Press ':i' to enter insert mode and Ctrl+C to exit the editor."
+        );
+        self.run_buffer_session();
+
+        if !post_session_options.is_empty() {
+            let mut store = self.buffers.lock().expect("buffer store lock poisoned");
+            self.apply_post_session_options(&mut store, post_session_options, args);
+        }
+        ControlFlow::CONTINUE
+    }
+
+    fn handle_macro_commands(&mut self, bufcmd: &str) -> ControlFlow {
+        ControlFlow::CONTINUE
+    }
+
+    fn handle_pipeline_commands(&mut self, bufcmd: &str) -> ControlFlow {
+        ControlFlow::CONTINUE
+    }
+}
+
+impl ControlState {
+    fn apply_pre_session_options(&self, _store: &mut BufferStore, _options: &[char]) {}
+
+    fn apply_post_session_options(
+        &self,
+        store: &mut BufferStore,
+        options: &[char],
+        args: &[String],
+    ) {
+        for option in options {
+            match option {
+                'l' => {
+                    if store.is_empty() {
+                        println!("(no buffers)");
+                    } else {
+                        for name in store.list() {
+                            println!("- {name}");
+                        }
+                    }
+                }
+                _ => {
+                    if let Some(buffer_name) = args.last() {
+                        println!(
+                            "Unhandled post-session option '-{option}' for buffer '{buffer_name}'"
+                        );
+                    } else {
+                        println!("Unhandled post-session option '-{option}'");
+                    }
+                }
+            }
         }
     }
 }
