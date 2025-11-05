@@ -236,6 +236,24 @@ mod tests {
     }
 
     #[test]
+    fn alias_sink_stdout_variant_writes_without_panic() {
+        let mut sink = AliasSink::Stdout;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            sink.write_line("stdout coverage");
+        }));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn alias_sink_stderr_variant_writes_without_panic() {
+        let mut sink = AliasSink::Stderr;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            sink.write_line("stderr coverage");
+        }));
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn prints_all_aliases_when_no_arguments() {
         let (mut alias, stdout, stderr) = setup_alias();
         let _ = alias.call(&["ls=ls -p".into()]);

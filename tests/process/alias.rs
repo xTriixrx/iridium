@@ -120,3 +120,17 @@ fn dash_p_is_rejected() {
     assert_eq!(buffer_to_string(&stdout), "");
     assert_eq!(buffer_to_string(&stderr), "alias: -p: invalid option\n");
 }
+
+#[test]
+fn default_sinks_write_to_standard_streams_without_override() {
+    let map = BuiltinMap::new();
+    // Define aliases while sinks are still the defaults.
+    assert_eq!(invoke_alias(&map, &["ll=ls -al"]), Some(0));
+    assert_eq!(invoke_alias(&map, &["gs=git status"]), Some(0));
+
+    // Listing all aliases should print via the default stdout sink.
+    assert_eq!(invoke_alias(&map, &[]), Some(0));
+
+    // Querying an unknown alias triggers the stderr sink.
+    assert_eq!(invoke_alias(&map, &["unknown"]), Some(1));
+}
