@@ -1,5 +1,5 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::editor::buffer_editor::EditorMode;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputAction {
@@ -26,7 +26,12 @@ impl InputHandler {
         Self::default()
     }
 
-    pub fn process(&mut self, event: &Event, mode: &EditorMode, in_insert_mode: bool) -> Option<InputAction> {
+    pub fn process(
+        &mut self,
+        event: &Event,
+        mode: &EditorMode,
+        in_insert_mode: bool,
+    ) -> Option<InputAction> {
         match event {
             Event::Key(KeyEvent {
                 code,

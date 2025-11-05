@@ -83,7 +83,10 @@ impl BufferEditor {
             }
 
             let event = read()?;
-            if let Some(action) = self.input.process(&event, &self.mode, self.mode == EditorMode::Insert) {
+            if let Some(action) =
+                self.input
+                    .process(&event, &self.mode, self.mode == EditorMode::Insert)
+            {
                 self.apply_input_action(action)?;
             }
         }
@@ -286,17 +289,15 @@ impl BufferEditor {
             }
             InputAction::ExecuteCommand(command) => {
                 let command = command.trim();
-                
+
                 if command.is_empty() {
                     self.restore_after_command();
                 }
                 if command == "q" || command == "q!" {
                     self.quit = true;
-                }
-                else if command == "i" {
+                } else if command == "i" {
                     self.enter_insert_mode();
-                }
-                else if command == "r" {
+                } else if command == "r" {
                     self.enter_read_mode();
                 }
 
@@ -322,7 +323,12 @@ impl BufferEditor {
             let _ = Terminal::print("Closed editor.\r\n");
         } else {
             let buffer_view = View::snapshot(&self.name);
-            View::render(&buffer_view, &self.mode, &self.command_input, self.scroll_offset)?;
+            View::render(
+                &buffer_view,
+                &self.mode,
+                &self.command_input,
+                self.scroll_offset,
+            )?;
             let Size { width, height } = Terminal::size()?;
             let cursor_position = if !self.command_input.is_empty() {
                 let column = self
@@ -405,7 +411,10 @@ impl BufferEditor {
             self.mode = match self.prev_mode {
                 EditorMode::Insert => EditorMode::Insert,
                 EditorMode::Read => EditorMode::Read,
-                _ => panic!("Unknown editor mode was entered! Editor mode: {:?}", self.mode),
+                _ => panic!(
+                    "Unknown editor mode was entered! Editor mode: {:?}",
+                    self.mode
+                ),
             };
         }
     }
