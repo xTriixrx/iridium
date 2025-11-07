@@ -1,108 +1,6 @@
-use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
-
-#[derive(Debug, Clone, Default)]
-pub struct BufferStore {
-    items: HashMap<String, Buffer>,
-}
-
-impl BufferStore {
-    pub fn new() -> Self {
-        Self {
-            items: HashMap::new(),
-        }
-    }
-
-    pub fn open(&mut self, name: impl Into<String>) -> &mut Buffer {
-        let key = name.into();
-        self.items
-            .entry(key.clone())
-            .or_insert_with(|| Buffer::new(key))
-    }
-
-    pub fn get(&self, name: &str) -> Option<&Buffer> {
-        self.items.get(name)
-    }
-
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Buffer> {
-        self.items.get_mut(name)
-    }
-
-    pub fn list(&self) -> Vec<String> {
-        self.items.keys().cloned().collect()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
-
-    pub fn insert_char(&mut self, name: &str, row: usize, col: usize, ch: char) {
-        let buffer = self
-            .items
-            .entry(name.to_string())
-            .or_insert_with(|| Buffer::new(name.to_string()));
-        buffer.insert_char(row, col, ch);
-    }
-
-    pub fn save_all(&mut self) -> io::Result<()> {
-        for buffer in self.items.values_mut() {
-            if buffer.is_dirty() {
-                buffer.save_to_disk()?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn save(&mut self, name: &str) -> io::Result<()> {
-        if let Some(buffer) = self.items.get_mut(name) {
-            buffer.save_to_disk()
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn save_if_dirty(&mut self, name: &str) -> io::Result<bool> {
-        if let Some(buffer) = self.items.get_mut(name) {
-            if buffer.is_dirty() {
-                buffer.save_to_disk()?;
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    pub fn is_dirty(&self, name: &str) -> bool {
-        self.items
-            .get(name)
-            .map(|buffer| buffer.is_dirty())
-            .unwrap_or(false)
-    }
-
-    pub fn delete_char(&mut self, name: &str, row: usize, col: usize) -> Option<(usize, usize)> {
-        let buffer = self.items.get_mut(name)?;
-        buffer.delete_char(row, col)
-    }
-
-    pub fn insert_newline(&mut self, name: &str, row: usize, col: usize) -> (usize, usize) {
-        let buffer = self
-            .items
-            .entry(name.to_string())
-            .or_insert_with(|| Buffer::new(name.to_string()));
-        buffer.insert_newline(row, col)
-    }
-
-    pub fn pad_line(&mut self, name: &str, row: usize, width: usize) {
-        let buffer = self
-            .items
-            .entry(name.to_string())
-            .or_insert_with(|| Buffer::new(name.to_string()));
-        buffer.pad_line(row, width);
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct Buffer {
@@ -112,14 +10,13 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    fn new(name: String) -> Self {
+    pub(crate) fn new(name: String) -> Self {
         Self {
             name,
             lines: Vec::new(),
             dirty: false,
         }
     }
-
     pub fn append(&mut self, line: String) {
         self.lines.push(line);
         self.dirty = true;
@@ -174,7 +71,7 @@ impl Buffer {
         &self.lines
     }
 
-    fn save_to_disk(&mut self) -> io::Result<()> {
+    pub(crate) fn save_to_disk(&mut self) -> io::Result<()> {
         let path = Path::new(&self.name);
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
@@ -191,7 +88,7 @@ impl Buffer {
         Ok(())
     }
 
-    fn delete_char(&mut self, row: usize, col: usize) -> Option<(usize, usize)> {
+    pub(crate) fn delete_char(&mut self, row: usize, col: usize) -> Option<(usize, usize)> {
         let line = self.lines.get_mut(row)?;
         let char_count = line.chars().count();
         if col == 0 || col > char_count {
@@ -205,7 +102,7 @@ impl Buffer {
         Some((row, col - 1))
     }
 
-    fn insert_newline(&mut self, row: usize, col: usize) -> (usize, usize) {
+    pub(crate) fn insert_newline(&mut self, row: usize, col: usize) -> (usize, usize) {
         while self.lines.len() <= row {
             self.lines.push(String::new());
         }
@@ -226,7 +123,7 @@ impl Buffer {
         (row + 1, 0)
     }
 
-    fn pad_line(&mut self, row: usize, width: usize) {
+    pub(crate) fn pad_line(&mut self, row: usize, width: usize) {
         while self.lines.len() <= row {
             self.lines.push(String::new());
         }
@@ -240,7 +137,7 @@ impl Buffer {
         }
     }
 
-    fn is_dirty(&self) -> bool {
+    pub(crate) fn is_dirty(&self) -> bool {
         self.dirty
     }
 
@@ -262,89 +159,115 @@ impl Buffer {
 
 #[cfg(test)]
 mod tests {
-    use super::BufferStore;
+    use super::Buffer;
     use std::fs;
     use std::io::Read;
 
-    fn unique_temp_file() -> std::path::PathBuf {
-        let mut path = std::env::temp_dir();
-        let unique = format!(
-            "iridium_buffer_test_{}_{}",
+    #[test]
+    fn append_adds_lines_and_clear_resets() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("first".into());
+        buffer.append("second".into());
+
+        assert_eq!(buffer.lines.len(), 2);
+        buffer.clear();
+        assert!(buffer.lines.is_empty());
+    }
+
+    #[test]
+    fn insert_and_delete_char_updates_content() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("abc".into());
+
+        buffer.insert_char(0, 1, 'X');
+        assert_eq!(buffer.lines[0], "aXc");
+
+        let pos = buffer.delete_char(0, 2).expect("delete should succeed");
+        assert_eq!(pos, (0, 1));
+        assert_eq!(buffer.lines[0], "ac");
+    }
+
+    #[test]
+    fn insert_newline_and_pad_line_work() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("hello".into());
+
+        let (row, col) = buffer.insert_newline(0, 2);
+        assert_eq!((row, col), (1, 0));
+        assert_eq!(buffer.lines[0], "he");
+        assert_eq!(buffer.lines[1], "llo");
+
+        buffer.pad_line(1, 6);
+        assert_eq!(buffer.lines[1], "llo   ");
+    }
+
+    #[test]
+    fn remove_last_on_empty_returns_none() {
+        let mut buffer = Buffer::new("test".into());
+        assert!(buffer.remove_last().is_none());
+        assert!(!buffer.is_dirty());
+    }
+
+    #[test]
+    fn delete_char_out_of_bounds_is_noop() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("abc".into());
+        buffer.dirty = false;
+
+        assert!(buffer.delete_char(0, 0).is_none());
+        assert!(!buffer.is_dirty());
+    }
+
+    #[test]
+    fn pad_line_with_shorter_width_keeps_clean_state() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("abcd".into());
+        buffer.dirty = false;
+
+        buffer.pad_line(0, 2);
+        assert_eq!(buffer.lines[0], "abcd");
+        assert!(!buffer.is_dirty());
+    }
+
+    #[test]
+    fn remove_last_marks_dirty_and_returns_line() {
+        let mut buffer = Buffer::new("test".into());
+        buffer.append("alpha".into());
+        buffer.append("beta".into());
+
+        let removed = buffer.remove_last();
+        assert_eq!(removed.as_deref(), Some("beta"));
+        assert!(buffer.is_dirty());
+        assert_eq!(buffer.lines(), &[String::from("alpha")]);
+    }
+
+    #[test]
+    fn save_to_disk_persists_contents_and_clears_dirty_flag() {
+        let temp_dir = std::env::temp_dir();
+        let path = temp_dir.join(format!(
+            "iridium_buffer_unit_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos()
-        );
-        path.push(unique);
-        path
-    }
-
-    #[test]
-    fn save_persists_buffer_contents() {
-        let path = unique_temp_file();
+        ));
         let path_str = path.to_string_lossy().to_string();
 
-        let mut store = BufferStore::new();
-        let buffer = store.open(path_str.clone());
-        buffer.append("first line".into());
-        buffer.append("second line".into());
+        let mut buffer = Buffer::new(path_str.clone());
+        buffer.append("line 1".into());
+        buffer.append("line 2".into());
+        assert!(buffer.is_dirty());
 
-        store.save(&path_str).expect("save should succeed");
-
-        assert!(!store.is_dirty(&path_str));
+        buffer.save_to_disk().expect("save_to_disk should succeed");
+        assert!(!buffer.is_dirty());
 
         let mut file = fs::File::open(&path).expect("file should exist");
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .expect("should read file");
-
-        assert_eq!(contents, "first line\nsecond line\n");
-
-        let _ = fs::remove_file(&path);
-    }
-
-    #[test]
-    fn save_if_dirty_only_writes_when_modified() {
-        let path = unique_temp_file();
-        let path_str = path.to_string_lossy().to_string();
-
-        let mut store = BufferStore::new();
-        let buffer = store.open(path_str.clone());
-        buffer.append("line".into());
-
-        assert!(
-            store
-                .save_if_dirty(&path_str)
-                .expect("save_if_dirty should succeed")
-        );
-        assert!(!store.is_dirty(&path_str));
-
-        // Second call should be a no-op and report false.
-        assert!(
-            !store
-                .save_if_dirty(&path_str)
-                .expect("save_if_dirty should succeed")
-        );
+        assert_eq!(contents, "line 1\nline 2\n");
 
         let _ = fs::remove_file(&path);
-    }
-
-    #[test]
-    fn save_all_does_not_create_files_for_clean_buffers() {
-        let path = unique_temp_file();
-        let path_str = path.to_string_lossy().to_string();
-
-        let mut store = BufferStore::new();
-        store.open(path_str.clone());
-
-        store
-            .save_all()
-            .expect("save_all should succeed for clean buffers");
-
-        assert!(
-            !path.exists(),
-            "save_all should not create files for clean buffers"
-        );
     }
 }

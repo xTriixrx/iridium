@@ -11,7 +11,7 @@ use crate::editor::buffer_editor::BufferEditor;
 use crate::editor::terminal::Terminal;
 use crate::process;
 use crate::process::builtin::map::BuiltinMap;
-use crate::store::buffer::BufferStore;
+use crate::store::buffer_store::BufferStore;
 
 /// Signals whether the control loop should continue or exit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
