@@ -127,3 +127,39 @@ fn save_all_does_not_create_files_for_clean_buffers() {
         "save_all should not create files for clean buffers"
     );
 }
+
+#[test]
+fn remove_buffers_ignores_unknown_entries() {
+    let mut store = BufferStore::new();
+    store.open("alpha");
+    store.open("beta");
+
+    assert!(store.remove("alpha"));
+    assert!(!store.remove("missing"));
+
+    let mut names = store.list();
+    names.sort();
+    assert_eq!(names, vec!["beta".to_string()]);
+}
+
+#[test]
+fn rename_updates_buffer_identity() {
+    let mut store = BufferStore::new();
+    store.open("alpha");
+    store.open("beta");
+
+    assert!(store.rename("alpha", "gamma"));
+    assert!(!store.rename("beta", "gamma"));
+    assert!(store.get("gamma").is_some());
+    assert!(store.get("alpha").is_none());
+}
+
+#[test]
+fn untitled_buffers_require_names_until_renamed() {
+    let mut store = BufferStore::new();
+    store.open_untitled("Untitled-1");
+
+    assert!(store.requires_name("Untitled-1"));
+    assert!(store.rename("Untitled-1", "named"));
+    assert!(!store.requires_name("named"));
+}

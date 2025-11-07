@@ -107,6 +107,7 @@ fn partition_options(options: Vec<char>) -> (Vec<char>, Vec<char>) {
 
 fn option_timing(option: char) -> TimingBucket {
     match option {
+        'd' | 'r' => TimingBucket::PreSession,
         'l' => TimingBucket::PostSession,
         _ => TimingBucket::PostSession,
     }
@@ -153,5 +154,6 @@ mod tests {
     fn classify_option_timing() {
         assert_eq!(option_timing('l'), TimingBucket::PostSession);
         assert_eq!(option_timing('x'), TimingBucket::PostSession);
+        assert_eq!(option_timing('r'), TimingBucket::PreSession);
     }
 }

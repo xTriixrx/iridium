@@ -50,16 +50,11 @@ impl Terminal {
     }
 
     pub fn enter(&self) -> Result<(), Error> {
-        enable_raw_mode()?;
-        Self::clear_screen()?;
-        Self::execute()?;
-        Ok(())
-    }
-
-    fn save_buffers(&self) -> Result<(), Error> {
-        let store = self.store_handle();
-        let mut store = store.lock().expect("buffer store lock poisoned");
-        store.save_all()?;
+        if std::env::var("IRIDIUM_SKIP_EDITOR").is_err() {
+            enable_raw_mode()?;
+            Self::clear_screen()?;
+            Self::execute()?;
+        }
         Ok(())
     }
 
@@ -135,18 +130,20 @@ impl Terminal {
     }
 
     pub fn terminate() -> Result<(), Error> {
-        let terminal = Self::instance();
-        terminal.save_buffers()?;
-        Self::execute()?;
-        disable_raw_mode()?;
+        if std::env::var("IRIDIUM_SKIP_EDITOR").is_err() {
+            Self::execute()?;
+            disable_raw_mode()?;
+        }
         Ok(())
     }
 
     fn initialize() -> Result<Terminal, Error> {
         let term = Terminal::new();
-        enable_raw_mode()?;
-        Self::clear_screen()?;
-        Self::execute()?;
+        if std::env::var("IRIDIUM_SKIP_EDITOR").is_err() {
+            enable_raw_mode()?;
+            Self::clear_screen()?;
+            Self::execute()?;
+        }
         Ok(term)
     }
 
