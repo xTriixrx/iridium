@@ -32,6 +32,20 @@ fn list_option_does_not_create_buffer() {
 
     assert_eq!(flow, ControlFlow::CONTINUE);
     assert!(state.list_buffers().is_empty());
+    // assert!(state.last_listed_buffers().is_empty());
+}
+
+#[test]
+fn list_option_reports_existing_buffers() {
+    let mut state = headless_state();
+    let _ = state.handle_line(":b alpha beta");
+
+    let flow = state.handle_line(":b -l");
+    assert_eq!(flow, ControlFlow::CONTINUE);
+    assert_eq!(
+        state.list_buffers(),
+        &["alpha".to_string(), "beta".to_string()]
+    );
 }
 
 #[test]

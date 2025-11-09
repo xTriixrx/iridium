@@ -213,8 +213,7 @@ impl ControlState {
         }
 
         if !post_session_options.is_empty() {
-            let mut store = self.buffers.lock().expect("buffer store lock poisoned");
-            self.apply_post_session_options(&mut store, post_session_options, args);
+            self.apply_post_session_options(post_session_options, args);
         }
         ControlFlow::CONTINUE
     }
@@ -282,19 +281,19 @@ impl ControlState {
         handled
     }
 
-    fn apply_post_session_options(
-        &self,
-        store: &mut BufferStore,
-        options: &[char],
-        args: &[String],
-    ) {
+    fn apply_post_session_options(&mut self, options: &[char], args: &[String]) {
+        let store = self
+            .buffers
+            .lock()
+            .expect("buffer store lock poisoned");
         for option in options {
             match option {
                 'l' => {
                     if store.is_empty() {
                         println!("(no buffers)");
                     } else {
-                        for name in store.list() {
+                        let names = store.list();
+                        for name in &names {
                             println!("- {name}");
                         }
                     }
@@ -518,6 +517,43 @@ mod tests {
 
         let store = state.buffers.lock().unwrap();
         assert!(store.is_empty());
+    }
+
+    #[test]
+    fn list_option_leaves_existing_buffers_intact() {
+        let mut state = make_state();
+        {
+            let mut store = state.buffers.lock().unwrap();
+            store.open("alpha");
+            store.open("beta");
+        }
+
+        let flow = state.handle_buffer_commands(":b -l");
+        assert_eq!(flow, ControlFlow::CONTINUE);
+
+        let store = state.buffers.lock().unwrap();
+        let mut names = store.list();
+        names.sort();
+        assert_eq!(names, vec!["alpha".to_string(), "beta".to_string()]);
+    }
+
+    #[test]
+    fn list_option_outputs_existing_buffers() {
+        let mut state = make_state();
+        {
+            let mut store = state.buffers.lock().unwrap();
+            store.open("alpha");
+            store.open("beta");
+        }
+
+        let flow = state.handle_buffer_commands(":b -l");
+
+        assert_eq!(flow, ControlFlow::CONTINUE);
+
+        let store = state.buffers.lock().unwrap();
+        let mut names = store.list();
+        names.sort();
+        assert_eq!(names, vec!["alpha".to_string(), "beta".to_string()]);
     }
 
     #[test]

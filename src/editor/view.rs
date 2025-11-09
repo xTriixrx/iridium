@@ -55,6 +55,7 @@ impl View {
         buffer_name: &str,
         mode: &EditorMode,
         command_input: &str,
+        status_message: Option<&str>,
         scroll_offset: usize,
         cursor_position: (usize, usize),
     ) -> Result<(), Error> {
@@ -82,8 +83,14 @@ impl View {
             Terminal::print("\r\n")?;
         }
         Terminal::clear_line()?;
-        let command_line =
-            build_command_line(width, command_input, buffer_name, mode, cursor_position);
+        let command_line = build_command_line(
+            width,
+            command_input,
+            buffer_name,
+            mode,
+            cursor_position,
+            status_message,
+        );
         Terminal::print(&command_line)?;
 
         Ok(())
@@ -96,6 +103,7 @@ fn build_command_line(
     buffer_name: &str,
     mode: &EditorMode,
     cursor_position: (usize, usize),
+    status_message: Option<&str>,
 ) -> String {
     if width == 0 {
         return String::new();
@@ -103,18 +111,52 @@ fn build_command_line(
 
     let mut line: Vec<char> = vec![' '; width];
 
-    let display_command = if command_input.is_empty() {
-        ":"
-    } else {
-        command_input
-    };
-
-    for (idx, ch) in display_command.chars().take(width).enumerate() {
-        line[idx] = ch;
-    }
-
     let mode_label = format!("[{}]", mode_name(mode));
     let mode_chars: Vec<char> = mode_label.chars().collect();
+    let (row, col) = cursor_position;
+    let cursor_label = format!("{},{}", row, col);
+    let name_and_cursor = format!("{} {}", buffer_name, cursor_label);
+
+    if let Some(message) = status_message {
+        let mode_len = mode_chars.len().min(width);
+        if mode_len > 0 {
+            let mode_start = width - mode_len;
+            let slice_start = mode_chars.len().saturating_sub(mode_len);
+            for (offset, ch) in mode_chars[slice_start..].iter().enumerate() {
+                line[mode_start + offset] = *ch;
+            }
+        }
+
+        let available_for_combo = width.saturating_sub(mode_len);
+        let combo_raw = format!(" {} ", name_and_cursor);
+        let combo_chars: Vec<char> = combo_raw.chars().collect();
+        let combo_len = combo_chars.len().min(available_for_combo);
+        if combo_len > 0 {
+            let combo_start = available_for_combo - combo_len;
+            let slice_start = combo_chars.len().saturating_sub(combo_len);
+            for (offset, ch) in combo_chars[slice_start..].iter().enumerate() {
+                line[combo_start + offset] = *ch;
+            }
+        }
+
+        let message_width = width.saturating_sub(mode_len + combo_len);
+        for (idx, ch) in message.chars().take(message_width).enumerate() {
+            line[idx] = ch;
+        }
+
+        return line.iter().collect();
+    } else {
+        let display_command = if command_input.is_empty() {
+            ":"
+        } else {
+            command_input
+        };
+
+        for (idx, ch) in display_command.chars().take(width).enumerate() {
+            line[idx] = ch;
+        }
+    }
+
     if mode_chars.len() <= width {
         let start = width - mode_chars.len();
         for (offset, ch) in mode_chars.iter().enumerate() {
@@ -123,15 +165,12 @@ fn build_command_line(
         }
     }
 
-    let (row, col) = cursor_position;
-    let cursor_label = format!("{},{}", row, col);
-    let name_and_cursor = format!("{} {}", buffer_name, cursor_label);
     let combo_chars: Vec<char> = name_and_cursor.chars().collect();
     if !combo_chars.is_empty() && combo_chars.len() <= width {
         let start = width.saturating_sub(combo_chars.len()) / 2;
         for (offset, ch) in combo_chars.iter().enumerate() {
             let idx = start + offset;
-            if idx < width && line[idx].is_ascii_whitespace() {
+            if idx < width {
                 line[idx] = *ch;
             }
         }
@@ -154,7 +193,7 @@ mod tests {
 
     #[test]
     fn command_line_includes_buffer_name_cursor_and_mode() {
-        let line = build_command_line(40, "", "test.rs", &EditorMode::Insert, (3, 5));
+        let line = build_command_line(40, "", "test.rs", &EditorMode::Insert, (3, 5), None);
 
         assert!(line.starts_with(":"));
         assert!(line.ends_with("[INSERT]"));
@@ -167,7 +206,7 @@ mod tests {
 
     #[test]
     fn command_line_respects_command_input_and_mode() {
-        let line = build_command_line(40, ":w", "buffer", &EditorMode::Read, (1, 1));
+        let line = build_command_line(40, ":w", "buffer", &EditorMode::Read, (1, 1), None);
 
         assert!(line.starts_with(":w"));
         assert!(line.ends_with("[READ]"));
@@ -176,11 +215,27 @@ mod tests {
 
     #[test]
     fn cursor_position_changes_are_reflected() {
-        let first = build_command_line(30, ":", "file", &EditorMode::Command, (2, 4));
-        let second = build_command_line(30, ":", "file", &EditorMode::Command, (5, 10));
+        let first = build_command_line(30, ":", "file", &EditorMode::Command, (2, 4), None);
+        let second = build_command_line(30, ":", "file", &EditorMode::Command, (5, 10), None);
 
         assert!(first.contains("file 2,4"));
         assert!(second.contains("file 5,10"));
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn status_message_overrides_command_input() {
+        let line = build_command_line(
+            80,
+            ":w",
+            "buffer",
+            &EditorMode::Command,
+            (1, 1),
+            Some("This buffer is required to be saved."),
+        );
+
+        assert!(line.starts_with("This buffer is required to be saved"));
+        assert!(line.contains("[COMMAND]"));
+        assert!(line.contains("buffer 1,1"));
     }
 }

@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
 
-/// Represents the editable contents of a named buffer on disk.
+/// Represents the editable contents of a named buffer in memory.
 ///
 /// `Buffer` tracks the in-memory lines, dirty state, and persistence helpers
 /// that back the editor UI and shell commands.
@@ -12,6 +12,7 @@ pub struct Buffer {
     lines: Vec<String>,
     dirty: bool,
     requires_name: bool,
+    is_open: bool,
 }
 
 impl Buffer {
@@ -20,7 +21,7 @@ impl Buffer {
         Self::with_name_state(name, false)
     }
 
-    pub(crate) fn untitled(name: String) -> Self {
+    pub(crate) fn new_untitled(name: String) -> Self {
         Self::with_name_state(name, true)
     }
 
@@ -30,8 +31,18 @@ impl Buffer {
             lines: Vec::new(),
             dirty: false,
             requires_name,
+            is_open: true,
         }
     }
+
+    pub fn is_open(&self) -> bool {
+        self.is_open
+    }
+
+    pub fn set_open(&mut self, open: bool) {
+        self.is_open = open;
+    }
+
     /// Append a new line of text and mark the buffer dirty.
     pub fn append(&mut self, line: String) {
         self.lines.push(line);
@@ -169,6 +180,10 @@ impl Buffer {
     /// Whether the buffer contains unsaved changes.
     pub(crate) fn is_dirty(&self) -> bool {
         self.dirty
+    }
+
+    pub(crate) fn mark_clean(&mut self) {
+        self.dirty = false;
     }
 
     pub(crate) fn set_name(&mut self, name: String) {
