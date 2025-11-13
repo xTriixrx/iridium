@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io;
 
 use super::buffer::Buffer;
+use super::buffer_snapshot::BufferSnapshot;
 
 /// In-memory manager that tracks named buffers and orchestrates their lifecycle.
 ///
@@ -202,6 +203,24 @@ impl BufferStore {
                 true
             }
             None => false,
+        }
+    }
+
+    /// Produce snapshots of every buffer for persistence.
+    pub fn snapshots(&self) -> Vec<BufferSnapshot> {
+        self.buffers
+            .values()
+            .map(|buffer| buffer.to_snapshot())
+            .collect()
+    }
+
+    /// Replace the current store contents with the provided snapshots.
+    pub fn hydrate(&mut self, snapshots: Vec<BufferSnapshot>) {
+        self.buffers.clear();
+        for snapshot in snapshots {
+            let key = snapshot.name.clone();
+            let buffer = Buffer::from_snapshot(snapshot);
+            self.buffers.insert(key, buffer);
         }
     }
 }

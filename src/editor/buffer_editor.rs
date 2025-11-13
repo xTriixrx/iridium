@@ -996,7 +996,9 @@ mod tests {
         editor.close_current_buffer(true).expect("force close");
         {
             let store = handle.lock().unwrap();
-            let alpha = store.get("alpha").expect("alpha should remain tracked after force close");
+            let alpha = store
+                .get("alpha")
+                .expect("alpha should remain tracked after force close");
             assert!(!alpha.is_open());
         }
         assert!(editor.quit);
@@ -1012,9 +1014,7 @@ mod tests {
 
         let mut editor = BufferEditor::new("alpha");
         editor.open("alpha");
-        editor
-            .execute_colon_command("q")
-            .expect(":q should warn");
+        editor.execute_colon_command("q").expect(":q should warn");
 
         assert_eq!(editor.status_message.as_deref(), Some(DIRTY_BUFFER_STATUS));
     }

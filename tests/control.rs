@@ -35,6 +35,7 @@ impl LineEditor for ScriptedEditor {
 fn drive_control_state_open_buffer() {
     unsafe {
         std::env::set_var("IRIDIUM_SKIP_EDITOR", "1");
+        std::env::set_var("IRIDIUM_DISABLE_PERSISTENCE", "1");
     }
     let mut control_state = ControlState::new();
     let mut editor = ScriptedEditor::new(vec![Ok(":b alpha".into()), Err(ReadlineError::Eof)]);
@@ -51,6 +52,7 @@ fn drive_control_state_open_buffer() {
 fn drive_control_state_handles_interrupt() {
     unsafe {
         std::env::set_var("IRIDIUM_SKIP_EDITOR", "1");
+        std::env::set_var("IRIDIUM_DISABLE_PERSISTENCE", "1");
     }
     let mut control_state = ControlState::new();
     let mut editor = ScriptedEditor::new(vec![Err(ReadlineError::Interrupted)]);

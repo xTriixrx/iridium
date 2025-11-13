@@ -8,11 +8,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+use crate::conf::{self, ConfigurationModel};
 use crate::editor::buffer_editor::BufferEditor;
 use crate::editor::terminal::Terminal;
 use crate::process;
 use crate::process::builtin::map::BuiltinMap;
 use crate::store::buffer_store::BufferStore;
+use crate::store::persistence::{PersistenceConfig, PersistenceError, PersistenceManager};
 
 /// Signals whether the control loop should continue or exit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +30,11 @@ pub struct ControlState {
     status: Option<i32>,
     builtin_map: BuiltinMap,
     mode: ShellMode,
+    #[allow(dead_code)]
+    config: ConfigurationModel,
     buffers: Arc<Mutex<BufferStore>>,
+    persistence: PersistenceManager,
+    persistence_flushed: bool,
     #[cfg(test)]
     opened_buffers: Vec<String>,
     #[cfg(test)]
@@ -45,13 +51,33 @@ impl ControlState {
     /// Build a new control state with the default builtin set.
     pub fn new() -> Self {
         let builtin_map = BuiltinMap::new();
-        let buffers = Arc::new(Mutex::new(BufferStore::new()));
+        let config = conf::load();
+        let persistence_config = PersistenceConfig::from_sources(Some(&config));
+        let persistence = PersistenceManager::new(persistence_config);
+
+        let mut backing_store = BufferStore::new();
+        match persistence.load() {
+            Ok(snapshots) => {
+                if !snapshots.is_empty() {
+                    backing_store.hydrate(snapshots);
+                }
+            }
+            Err(err) => {
+                eprintln!("Warning: unable to load persisted buffers: {err}");
+            }
+        }
+
+        let buffers = Arc::new(Mutex::new(backing_store));
         Terminal::instance().attach_store(Arc::clone(&buffers));
+        let persistence_flushed = !persistence.is_enabled();
         Self {
             status: Some(0),
             builtin_map,
             mode: ShellMode::Prompt,
+            config,
             buffers,
+            persistence,
+            persistence_flushed,
             #[cfg(test)]
             opened_buffers: Vec::new(),
             #[cfg(test)]
@@ -282,10 +308,7 @@ impl ControlState {
     }
 
     fn apply_post_session_options(&mut self, options: &[char], args: &[String]) {
-        let store = self
-            .buffers
-            .lock()
-            .expect("buffer store lock poisoned");
+        let store = self.buffers.lock().expect("buffer store lock poisoned");
         for option in options {
             match option {
                 'l' => {
@@ -316,6 +339,30 @@ impl ControlState {
     pub fn list_buffers(&self) -> Vec<String> {
         let store = self.buffers.lock().expect("buffer store lock poisoned");
         store.list()
+    }
+
+    /// Persist all buffers via the configured persistence backend.
+    pub fn flush_persistence(&mut self) -> Result<(), PersistenceError> {
+        if self.persistence_flushed {
+            return Ok(());
+        }
+
+        let snapshots = {
+            let store = self.buffers.lock().expect("buffer store lock poisoned");
+            store.snapshots()
+        };
+
+        self.persistence.store(&snapshots)?;
+        self.persistence_flushed = true;
+        Ok(())
+    }
+}
+
+impl Drop for ControlState {
+    fn drop(&mut self) {
+        if let Err(err) = self.flush_persistence() {
+            eprintln!("Warning: unable to persist buffers on drop: {err}");
+        }
     }
 }
 
@@ -398,11 +445,15 @@ mod tests {
     use uuid::Uuid;
 
     fn make_state() -> ControlState {
+        let persistence = PersistenceManager::new(PersistenceConfig::disabled());
         ControlState {
             status: Some(0),
             builtin_map: BuiltinMap::new(),
             mode: ShellMode::Prompt,
+            config: ConfigurationModel::default(),
             buffers: Arc::new(Mutex::new(BufferStore::new())),
+            persistence,
+            persistence_flushed: true,
             opened_buffers: Vec::new(),
             force_quit_all: false,
         }

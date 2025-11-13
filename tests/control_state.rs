@@ -4,6 +4,7 @@ use uuid::Uuid;
 fn headless_state() -> ControlState {
     unsafe {
         std::env::set_var("IRIDIUM_SKIP_EDITOR", "1");
+        std::env::set_var("IRIDIUM_DISABLE_PERSISTENCE", "1");
     }
     ControlState::new()
 }

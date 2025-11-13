@@ -1,3 +1,4 @@
+use crate::store::buffer_snapshot::BufferSnapshot;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
@@ -197,6 +198,26 @@ impl Buffer {
 
     pub(crate) fn mark_requires_name(&mut self, requires_name: bool) {
         self.requires_name = requires_name;
+    }
+
+    pub(crate) fn to_snapshot(&self) -> BufferSnapshot {
+        BufferSnapshot::new(
+            self.name.clone(),
+            self.lines.clone(),
+            self.requires_name,
+            self.is_open,
+            self.dirty,
+        )
+    }
+
+    pub(crate) fn from_snapshot(snapshot: BufferSnapshot) -> Self {
+        Self {
+            name: snapshot.name,
+            lines: snapshot.lines,
+            dirty: snapshot.dirty,
+            requires_name: snapshot.requires_name,
+            is_open: snapshot.is_open,
+        }
     }
 
     /// Translate a character index into a byte offset for utf-8 strings.

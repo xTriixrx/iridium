@@ -16,6 +16,7 @@ use std::io::{self, Write};
 pub trait ControlSession {
     fn prompt(&self) -> String;
     fn handle_line(&mut self, line: &str) -> ControlFlow;
+    fn flush_persistence(&mut self);
 }
 
 impl ControlSession for ControlState {
@@ -25,6 +26,12 @@ impl ControlSession for ControlState {
 
     fn handle_line(&mut self, line: &str) -> ControlFlow {
         ControlState::handle_line(self, line)
+    }
+
+    fn flush_persistence(&mut self) {
+        if let Err(err) = ControlState::flush_persistence(self) {
+            eprintln!("Warning: unable to persist buffers: {err}");
+        }
     }
 }
 
@@ -137,6 +144,7 @@ where
         }
     }
 
+    control_state.flush_persistence();
     Ok(())
 }
 
@@ -150,6 +158,7 @@ mod tests {
     use std::fs;
     use std::io::{self, Cursor};
     use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
     use uuid::Uuid;
 
     struct MockControl {
@@ -180,6 +189,8 @@ mod tests {
             }
             ControlFlow::CONTINUE
         }
+
+        fn flush_persistence(&mut self) {}
     }
 
     enum Response {
@@ -235,6 +246,11 @@ mod tests {
         }
     }
 
+    fn home_lock() -> &'static Mutex<()> {
+        static HOME_GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+        HOME_GUARD.get_or_init(|| Mutex::new(()))
+    }
+
     fn set_home(dir: &PathBuf) -> Option<String> {
         let previous = env::var("HOME").ok();
         unsafe {
@@ -251,6 +267,7 @@ mod tests {
 
     #[test]
     fn load_history_replays_entries() {
+        let _home_guard = home_lock().lock().unwrap();
         let temp_dir = env::temp_dir().join(format!("iridium_test_{}", Uuid::new_v4()));
         fs::create_dir_all(&temp_dir).unwrap();
         let history_path = temp_dir.join(".iridium_history");
@@ -270,6 +287,7 @@ mod tests {
 
     #[test]
     fn load_history_handles_error() {
+        let _home_guard = home_lock().lock().unwrap();
         let temp_dir = env::temp_dir().join(format!("iridium_test_{}", Uuid::new_v4()));
         fs::create_dir_all(temp_dir.join(".iridium_history")).unwrap();
         let prev_home = set_home(&temp_dir);

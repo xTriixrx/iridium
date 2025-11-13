@@ -1,6 +1,6 @@
 mod cmd;
 mod complete;
-mod config;
+mod conf;
 mod control;
 mod control_state;
 mod editor;

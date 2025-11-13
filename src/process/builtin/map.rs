@@ -61,7 +61,6 @@ impl<T: Builtin + 'static> BuiltinAdapter for BuiltinWrapper<T> {
 struct BuiltinHandles {
     alias: Option<Rc<RefCell<Alias>>>,
     pwd: Option<Rc<RefCell<Pwd>>>,
-    cd: Option<Rc<RefCell<Cd>>>,
     which: Option<Rc<RefCell<Which>>>,
 }
 
@@ -73,7 +72,9 @@ macro_rules! register_builtins {
             match name.as_str() {
                 "alias" => handles.alias = Some(insert_builtin($map, "alias", Alias::new())),
                 "pwd" => handles.pwd = Some(insert_builtin($map, "pwd", Pwd::new())),
-                "cd" => handles.cd = Some(insert_builtin($map, "cd", Cd::new())),
+                "cd" => {
+                    insert_builtin($map, "cd", Cd::new());
+                }
                 "exit" => {
                     insert_builtin($map, "exit", Exit::new());
                 }
@@ -112,12 +113,7 @@ impl BuiltinMap {
     pub fn new() -> Self {
         let mut func_map: HashMap<String, Rc<dyn BuiltinAdapter>> = HashMap::new();
 
-        let BuiltinHandles {
-            alias,
-            pwd,
-            cd,
-            which,
-        } = register_builtins!(
+        let BuiltinHandles { alias, pwd, which } = register_builtins!(
             &mut func_map,
             vec![
                 "alias".to_string(),
@@ -135,10 +131,8 @@ impl BuiltinMap {
 
         let alias = alias.expect("alias builtin not registered");
         let pwd = pwd.expect("pwd builtin not registered");
-        let cd = cd.expect("cd builtin not registered");
         let which = which.expect("which builtin not registered");
 
-        cd.borrow_mut().set_pwd(pwd.clone());
         which.borrow_mut().set_aliases(alias.clone());
         let builtin_names: Vec<String> = func_map.keys().cloned().collect();
         which.borrow_mut().set_builtin_names(builtin_names);
