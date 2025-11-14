@@ -92,8 +92,7 @@ impl Buffer {
                 line.push(ch);
             } else {
                 let start = Self::byte_index(line, col);
-                let end = Self::byte_index(line, col + 1);
-                line.replace_range(start..end, &ch.to_string());
+                line.insert(start, ch);
             }
             self.dirty = true;
         }
@@ -262,11 +261,11 @@ mod tests {
         buffer.append("abc".into());
 
         buffer.insert_char(0, 1, 'X');
-        assert_eq!(buffer.lines[0], "aXc");
+        assert_eq!(buffer.lines[0], "aXbc");
 
         let pos = buffer.delete_char(0, 2).expect("delete should succeed");
         assert_eq!(pos, (0, 1));
-        assert_eq!(buffer.lines[0], "ac");
+        assert_eq!(buffer.lines[0], "abc");
     }
 
     /// Splitting a line and padding the continuation behaves as expected.

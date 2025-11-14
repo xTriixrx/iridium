@@ -184,6 +184,7 @@ fn mode_name(mode: &EditorMode) -> &'static str {
         EditorMode::Insert => "INSERT",
         EditorMode::Read => "READ",
         EditorMode::Command => "COMMAND",
+        EditorMode::Navigation => "NAV",
     }
 }
 
